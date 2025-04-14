@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { 
   Home, 
   LayoutDashboard, 
-  Flask, 
+  FlaskConical, 
   Leaf, 
   Scan, 
   BarChart2, 
@@ -24,7 +24,7 @@ type SidebarItem = {
 const sidebarItems: SidebarItem[] = [
   { name: 'Home', icon: Home, href: '/' },
   { name: 'Dashboard', icon: LayoutDashboard, href: '/dashboard' },
-  { name: 'Soil Lab', icon: Flask, href: '/soil-lab' },
+  { name: 'Soil Lab', icon: FlaskConical, href: '/soil-lab' },
   { name: 'Crop Advisor', icon: Leaf, href: '/crop-advisor' },
   { name: 'Disease Scan', icon: Scan, href: '/disease-scan' },
   { name: 'Market', icon: BarChart2, href: '/market' },

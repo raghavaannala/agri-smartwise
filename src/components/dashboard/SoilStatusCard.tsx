@@ -2,7 +2,7 @@
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
-import { Flask } from 'lucide-react';
+import { FlaskConical } from 'lucide-react';
 
 type SoilParameter = {
   name: string;
@@ -71,7 +71,7 @@ const SoilStatusCard = () => {
       <CardHeader className="flex flex-row items-center justify-between pb-2">
         <CardTitle className="text-lg font-semibold text-agri-green">
           <div className="flex items-center">
-            <Flask className="mr-2 h-5 w-5" />
+            <FlaskConical className="mr-2 h-5 w-5" />
             Soil Health Status
           </div>
         </CardTitle>
