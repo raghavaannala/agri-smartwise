@@ -1,7 +1,8 @@
-
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { CloudSun, Cloud, CloudRain, CloudLightning, CloudSnow, Thermometer } from 'lucide-react';
+import { CloudSun, Cloud, CloudRain, CloudLightning, CloudSnow, Thermometer, MapPin } from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
+import { getUserProfile } from '@/lib/firestore';
 
 type WeatherDay = {
   day: string;
@@ -67,6 +68,29 @@ const getWeatherIcon = (type: string) => {
 };
 
 const WeatherForecastCard = () => {
+  const [location, setLocation] = useState('Loading location...');
+  const { currentUser } = useAuth();
+  
+  useEffect(() => {
+    const fetchUserLocation = async () => {
+      if (currentUser) {
+        try {
+          const userProfile = await getUserProfile(currentUser.uid);
+          if (userProfile?.location) {
+            setLocation(userProfile.location);
+          } else {
+            setLocation('Tirupati, Andhra Pradesh'); // Default if not set
+          }
+        } catch (error) {
+          console.error('Error fetching user location:', error);
+          setLocation('Tirupati, Andhra Pradesh'); // Default on error
+        }
+      }
+    };
+    
+    fetchUserLocation();
+  }, [currentUser]);
+  
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between pb-2">
@@ -76,8 +100,9 @@ const WeatherForecastCard = () => {
             5-Day Weather Forecast
           </div>
         </CardTitle>
-        <span className="text-xs bg-agri-blue/10 text-agri-blue px-2 py-1 rounded-full">
-          Tirupati, Andhra Pradesh
+        <span className="text-xs bg-agri-blue/10 text-agri-blue px-2 py-1 rounded-full flex items-center">
+          <MapPin className="h-3 w-3 mr-1" />
+          {location}
         </span>
       </CardHeader>
       <CardContent>

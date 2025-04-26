@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" fill="none">
+  <!-- Background Circle -->
+  <circle cx="32" cy="32" r="30" fill="#4CAF50" />
+  <circle cx="32" cy="32" r="28" fill="#43A047" />
+  
+  <!-- Plant/Leaf Elements -->
+  <path d="M32 12C24 12 18 18 18 26C18 34 24 38 32 38C40 38 46 34 46 26C46 18 40 12 32 12Z" fill="#81C784" />
+  <path d="M32 14C25 14 20 19 20 26C20 33 25 36 32 36C39 36 44 33 44 26C44 19 39 14 32 14Z" fill="#A5D6A7" />
+  
+  <!-- Stem -->
+  <rect x="30" y="36" width="4" height="16" fill="#795548" />
+  
+  <!-- Sun Rays -->
+  <circle cx="32" cy="26" r="6" fill="#FFC107" />
+  <circle cx="32" cy="26" r="4" fill="#FFEB3B" />
+  
+  <!-- Water Droplet -->
+  <path d="M26 44C26 48 29 52 32 52C35 52 38 48 38 44C38 40 35 38 32 38C29 38 26 40 26 44Z" fill="#2196F3" />
+  <path d="M28 44C28 47 30 50 32 50C34 50 36 47 36 44C36 41 34 40 32 40C30 40 28 41 28 44Z" fill="#64B5F6" />
+</svg> 

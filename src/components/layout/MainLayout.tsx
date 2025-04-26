@@ -4,6 +4,7 @@ import Header from './Header';
 import Sidebar from './Sidebar';
 import Footer from './Footer';
 import AgribotChat from '../dashboard/AgribotChat';
+import VoiceAssistant from '../voice/VoiceAssistant';
 
 type MainLayoutProps = {
   children: React.ReactNode;
@@ -20,6 +21,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
         </main>
         <Footer />
         <AgribotChat />
+        <VoiceAssistant />
       </div>
     </div>
   );

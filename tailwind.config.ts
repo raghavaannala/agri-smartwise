@@ -70,14 +70,47 @@ export default {
 					ring: 'hsl(var(--sidebar-ring))'
 				},
 				agri: {
-					green: '#4CAF50',
-					yellow: '#FFEB3B',
-					blue: '#03A9F4',
-					soil: '#8B4513',
-					alert: '#FF5722',
-					lightGreen: '#8BC34A',
-					brown: '#795548',
-					offWhite: '#F9F9F9'
+					// Core brand colors
+					green: '#2E7D32', // Rich forest green
+					darkGreen: '#1B5E20', // Deep forest green
+					lightGreen: '#66BB6A', // Bright leaf green
+					freshGreen: '#81C784', // Fresh spring green
+					lime: '#AED581', // Lime green
+					
+					// Earth tones
+					soil: '#795548', // Rich soil brown
+					darkSoil: '#5D4037', // Deep earth brown
+					sand: '#D7CCC8', // Sandy soil
+					clay: '#A1887F', // Clay soil
+					
+					// Sky and water
+					blue: '#1976D2', // Sky blue
+					lightBlue: '#4FC3F7', // Water blue
+					teal: '#26A69A', // Teal accent
+					
+					// Harvest colors
+					yellow: '#FDD835', // Wheat/corn yellow
+					gold: '#FFB300', // Golden harvest
+					amber: '#FFB74D', // Amber grain
+					orange: '#FF9800', // Pumpkin/citrus
+					
+					// Fruit and vegetables
+					tomato: '#E53935', // Tomato red
+					berry: '#C2185B', // Berry purple
+					eggplant: '#7B1FA2', // Eggplant purple
+					carrot: '#FF7043', // Carrot orange
+					
+					// UI colors
+					alert: '#F44336', // Alert red
+					warning: '#FF9800', // Warning orange
+					success: '#4CAF50', // Success green
+					info: '#2196F3', // Information blue
+					
+					// Neutral tones
+					offWhite: '#FAFAFA', // Off-white background
+					paper: '#F5F5F5', // Paper background
+					stone: '#EEEEEE', // Stone gray
+					slate: '#90A4AE' // Slate blue-gray
 				}
 			},
 			borderRadius: {

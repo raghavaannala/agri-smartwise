@@ -1,15 +1,17 @@
-
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { BarChart2, TrendingUp, TrendingDown, LineChart } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ResponsiveContainer, LineChart as ReChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from 'recharts';
+import { useAuth } from '@/contexts/AuthContext';
+import { getUserProfile } from '@/lib/firestore';
 
 type Market = {
   name: string;
   todayPrice: number;
   yesterdayPrice: number;
   change: number;
+  location: string; // region/district
 };
 
 type Crop = {
@@ -22,14 +24,14 @@ type Crop = {
   }[];
 };
 
-const crops: Crop[] = [
+const defaultCrops: Crop[] = [
   {
     id: 'rice',
     name: 'Rice',
     markets: [
-      { name: 'Tirupati Mandi', todayPrice: 2450, yesterdayPrice: 2400, change: 2.08 },
-      { name: 'Nellore Market', todayPrice: 2500, yesterdayPrice: 2480, change: 0.81 },
-      { name: 'Chittoor Mandi', todayPrice: 2380, yesterdayPrice: 2420, change: -1.65 },
+      { name: 'Tirupati Mandi', todayPrice: 2450, yesterdayPrice: 2400, change: 2.08, location: 'Tirupati' },
+      { name: 'Nellore Market', todayPrice: 2500, yesterdayPrice: 2480, change: 0.81, location: 'Nellore' },
+      { name: 'Chittoor Mandi', todayPrice: 2380, yesterdayPrice: 2420, change: -1.65, location: 'Chittoor' },
     ],
     priceHistory: [
       { date: '1 Jul', price: 2400 },
@@ -45,9 +47,9 @@ const crops: Crop[] = [
     id: 'tomato',
     name: 'Tomato',
     markets: [
-      { name: 'Tirupati Mandi', todayPrice: 3850, yesterdayPrice: 3500, change: 10.0 },
-      { name: 'Nellore Market', todayPrice: 4000, yesterdayPrice: 3700, change: 8.11 },
-      { name: 'Chittoor Mandi', todayPrice: 3750, yesterdayPrice: 3600, change: 4.17 },
+      { name: 'Tirupati Mandi', todayPrice: 3850, yesterdayPrice: 3500, change: 10.0, location: 'Tirupati' },
+      { name: 'Nellore Market', todayPrice: 4000, yesterdayPrice: 3700, change: 8.11, location: 'Nellore' },
+      { name: 'Chittoor Mandi', todayPrice: 3750, yesterdayPrice: 3600, change: 4.17, location: 'Chittoor' },
     ],
     priceHistory: [
       { date: '1 Jul', price: 2200 },
@@ -63,9 +65,9 @@ const crops: Crop[] = [
     id: 'groundnut',
     name: 'Groundnut',
     markets: [
-      { name: 'Tirupati Mandi', todayPrice: 5200, yesterdayPrice: 5250, change: -0.95 },
-      { name: 'Nellore Market', todayPrice: 5300, yesterdayPrice: 5350, change: -0.93 },
-      { name: 'Chittoor Mandi', todayPrice: 5150, yesterdayPrice: 5100, change: 0.98 },
+      { name: 'Tirupati Mandi', todayPrice: 5200, yesterdayPrice: 5250, change: -0.95, location: 'Tirupati' },
+      { name: 'Nellore Market', todayPrice: 5300, yesterdayPrice: 5350, change: -0.93, location: 'Nellore' },
+      { name: 'Chittoor Mandi', todayPrice: 5150, yesterdayPrice: 5100, change: 0.98, location: 'Chittoor' },
     ],
     priceHistory: [
       { date: '1 Jul', price: 5300 },
@@ -84,7 +86,62 @@ const formatPrice = (price: number) => {
 };
 
 const MarketPriceCard = () => {
-  const [selectedCrop, setSelectedCrop] = useState<Crop>(crops[0]);
+  const [crops, setCrops] = useState<Crop[]>(defaultCrops);
+  const [selectedCrop, setSelectedCrop] = useState<Crop>(defaultCrops[0]);
+  const [userLocation, setUserLocation] = useState<string>('');
+  const { currentUser } = useAuth();
+
+  useEffect(() => {
+    const fetchUserLocation = async () => {
+      if (currentUser) {
+        try {
+          const userProfile = await getUserProfile(currentUser.uid);
+          if (userProfile?.location) {
+            // Extract district/city name from the full location
+            const locationParts = userProfile.location.split(',');
+            if (locationParts.length > 0) {
+              setUserLocation(locationParts[0].trim());
+            }
+          }
+        } catch (error) {
+          console.error('Error fetching user location:', error);
+        }
+      }
+    };
+
+    fetchUserLocation();
+  }, [currentUser]);
+
+  useEffect(() => {
+    if (userLocation) {
+      // Sort the markets for each crop to prioritize the user's location
+      const sortedCrops = defaultCrops.map(crop => {
+        const sortedMarkets = [...crop.markets].sort((a, b) => {
+          // Check if market location contains user's location (or vice versa)
+          const aMatches = a.location.includes(userLocation) || userLocation.includes(a.location);
+          const bMatches = b.location.includes(userLocation) || userLocation.includes(b.location);
+          
+          if (aMatches && !bMatches) return -1;
+          if (!aMatches && bMatches) return 1;
+          return 0;
+        });
+        
+        return {
+          ...crop,
+          markets: sortedMarkets
+        };
+      });
+      
+      setCrops(sortedCrops);
+      
+      // Update selected crop if it's already been set
+      const currentCropId = selectedCrop.id;
+      const updatedSelectedCrop = sortedCrops.find(c => c.id === currentCropId);
+      if (updatedSelectedCrop) {
+        setSelectedCrop(updatedSelectedCrop);
+      }
+    }
+  }, [userLocation]);
 
   const handleCropChange = (value: string) => {
     const crop = crops.find(c => c.id === value);
@@ -124,7 +181,11 @@ const MarketPriceCard = () => {
             {selectedCrop.markets.map((market) => (
               <div 
                 key={market.name} 
-                className="bg-white border rounded-lg p-3 shadow-sm"
+                className={`bg-white border rounded-lg p-3 shadow-sm ${
+                  market.location.includes(userLocation) || userLocation.includes(market.location) 
+                    ? 'border-agri-green/40' 
+                    : ''
+                }`}
               >
                 <div className="text-sm text-gray-500 mb-1">{market.name}</div>
                 <div className="flex justify-between items-center">
