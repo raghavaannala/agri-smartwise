@@ -114,9 +114,28 @@ const DiseaseDetectionCard = ({ initialImage = null, initialAnalysisType = 'dise
 
     const reader = new FileReader();
     reader.onload = async () => {
-      const imageData = reader.result as string;
-      await handleAnalyzeImage(imageData, activeTab);
+      try {
+        const imageData = reader.result as string;
+        await handleAnalyzeImage(imageData, activeTab);
+      } catch (error) {
+        console.error('Error processing image:', error);
+        toast({
+          title: t('error'),
+          description: t('errorProcessingImage'),
+          variant: "destructive"
+        });
+      }
     };
+    
+    reader.onerror = () => {
+      console.error('FileReader error');
+      toast({
+        title: t('error'),
+        description: t('errorReadingFile'),
+        variant: "destructive"
+      });
+    };
+    
     reader.readAsDataURL(file);
   };
 

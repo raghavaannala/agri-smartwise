@@ -60,52 +60,73 @@ const SoilLab = () => {
 
     const reader = new FileReader();
     reader.onload = async () => {
-      const imageData = reader.result as string;
-      setSelectedImage(imageData);
-      setIsAnalyzing(true);
-      
       try {
-        // Use Gemini AI to analyze the soil
-        const analysis = await analyzeSoil(imageData);
+        const imageData = reader.result as string;
+        setSelectedImage(imageData);
+        setIsAnalyzing(true);
         
-        // Create a default soil analysis result with mock data if the API doesn't return all fields
-        setAnalysisResult({
-          soilType: analysis.soilType || 'Loamy',
-          fertility: analysis.fertility || 'Medium',
-          phLevel: analysis.phLevel || '6.5',
-          recommendations: analysis.recommendations || t('soilLab.defaultRecommendation'),
-          suitableCrops: analysis.suitableCrops || [t('soilLab.wheat'), t('soilLab.corn'), t('soilLab.rice')],
-          imageSrc: imageData,
-          nutrients: {
-            nitrogen: analysis.nutrients?.nitrogen || 35,
-            phosphorus: analysis.nutrients?.phosphorus || 28,
-            potassium: analysis.nutrients?.potassium || 42,
-            organicMatter: analysis.nutrients?.organicMatter || 15
-          },
-          properties: {
-            ph: analysis.properties?.ph || 6.5,
-            texture: analysis.properties?.texture || 'Loamy',
-            waterRetention: analysis.properties?.waterRetention || 65,
-            drainage: analysis.properties?.drainage || 'Good'
-          }
-        });
-        
-        toast({
-          title: t('soilAnalysisComplete'),
-          description: `${t('soilType')}: ${analysis.soilType}, ${t('fertility')}: ${analysis.fertility}`,
-          variant: "default"
-        });
+        try {
+          // Use Gemini AI to analyze the soil
+          const analysis = await analyzeSoil(imageData);
+          
+          // Create a default soil analysis result with mock data if the API doesn't return all fields
+          setAnalysisResult({
+            soilType: analysis.soilType || 'Loamy',
+            fertility: analysis.fertility || 'Medium',
+            phLevel: analysis.phLevel || '6.5',
+            recommendations: analysis.recommendations || t('soilLab.defaultRecommendation'),
+            suitableCrops: analysis.suitableCrops || [t('soilLab.wheat'), t('soilLab.corn'), t('soilLab.rice')],
+            imageSrc: imageData,
+            nutrients: {
+              nitrogen: analysis.nutrients?.nitrogen || 35,
+              phosphorus: analysis.nutrients?.phosphorus || 28,
+              potassium: analysis.nutrients?.potassium || 42,
+              organicMatter: analysis.nutrients?.organicMatter || 15
+            },
+            properties: {
+              ph: analysis.properties?.ph || 6.5,
+              texture: analysis.properties?.texture || 'Loamy',
+              waterRetention: analysis.properties?.waterRetention || 65,
+              drainage: analysis.properties?.drainage || 'Good'
+            }
+          });
+          
+          toast({
+            title: t('soilAnalysisComplete'),
+            description: `${t('soilType')}: ${analysis.soilType}, ${t('fertility')}: ${analysis.fertility}`,
+            variant: "default"
+          });
+        } catch (error) {
+          console.error('Error analyzing soil:', error);
+          toast({
+            title: t('analysisFailed'),
+            description: t('unableToAnalyzeTheSoilImagePleaseTryAgain'),
+            variant: "destructive"
+          });
+        } finally {
+          setIsAnalyzing(false);
+        }
       } catch (error) {
-        console.error('Error analyzing soil:', error);
+        console.error('Error processing image:', error);
+        setIsAnalyzing(false);
         toast({
-          title: t('analysisFailed'),
-          description: t('unableToAnalyzeTheSoilImagePleaseTryAgain'),
+          title: t('error'),
+          description: t('errorProcessingImage'),
           variant: "destructive"
         });
-      } finally {
-        setIsAnalyzing(false);
       }
     };
+    
+    reader.onerror = () => {
+      console.error('FileReader error');
+      setIsAnalyzing(false);
+      toast({
+        title: t('error'),
+        description: t('errorReadingFile'),
+        variant: "destructive"
+      });
+    };
+    
     reader.readAsDataURL(file);
   };
 

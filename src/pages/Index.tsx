@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import MainLayout from '@/components/layout/MainLayout';
 import WelcomeBanner from '@/components/layout/WelcomeBanner';
 import SoilStatusCard from '@/components/dashboard/SoilStatusCard';
@@ -28,12 +28,21 @@ import {
   LayoutGrid,
   LayoutList,
   Scan,
-  Loader,
+  Loader2,
   Camera,
-  Upload
+  Upload,
+  ChevronRight,
+  Globe,
+  AlertCircle,
+  MapPin,
+  ArrowRight,
+  CalendarClock,
+  Newspaper,
+  Flame,
+  RefreshCw
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Card, 
   CardContent, 
@@ -50,35 +59,75 @@ import {
 } from '@/components/ui/tabs';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
+import { Progress } from '@/components/ui/progress';
+import { Badge } from '@/components/ui/badge';
+import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import { useLocation } from '../hooks/useLocation';
 import { getCurrentWeather } from '../services/weatherService';
+import { useToast } from '@/components/ui/use-toast';
 
 const Index = () => {
   const { currentUser } = useAuth();
   const { t, i18n } = useTranslation();
   const [userName, setUserName] = useState('Guest');
   const [userLocation, setUserLocation] = useState('Tirupati, Andhra Pradesh');
-  // Add state to track language changes
   const [currentLang, setCurrentLang] = useState(i18n.language);
   const [isLoading, setIsLoading] = useState(true);
   const [lastUpdate, setLastUpdate] = useState(Date.now());
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [activeTab, setActiveTab] = useState('overview');
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [dashboardSection, setDashboardSection] = useState('main');
   const navigate = useNavigate();
+  const { toast } = useToast();
+  
+  // Farm data states
+  const [farmData, setFarmData] = useState({
+    soilHealth: { status: 'Good', lastUpdated: 'Yesterday' },
+    cropHealth: { status: 'Good', lastScanned: '2 days ago' },
+    irrigationStatus: { nextScheduled: 'Tomorrow', moistureLevel: 65 }
+  });
+  
+  // Global news/trends (placeholder for real API data)
+  const [globalAgriNews, setGlobalAgriNews] = useState([
+    { title: 'Global wheat prices stabilize after 3-month volatility', category: 'Market', date: 'Today' },
+    { title: 'New drought-resistant crop varieties show promise in field tests', category: 'Innovation', date: 'Yesterday' },
+    { title: 'Climate patterns shifting farming seasons across continents', category: 'Climate', date: '2 days ago' }
+  ]);
   
   // Location and weather data
   const { location, loading: locationLoading, usingFallback } = useLocation();
   const [weatherData, setWeatherData] = useState({
     temperature: 32,
-    condition: 'Sunny'
+    condition: 'Sunny',
+    forecast: []
   });
   
   // Reference to hidden file input
-  const fileInputRef = React.useRef<HTMLInputElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   
-  // Animation variants for cards
+  // Animation variants for sections
+  const containerVariants = {
+    hidden: { opacity: 0 },
+    visible: { 
+      opacity: 1,
+      transition: { 
+        when: "beforeChildren",
+        staggerChildren: 0.1
+      }
+    }
+  };
+  
+  const itemVariants = {
+    hidden: { y: 20, opacity: 0 },
+    visible: { 
+      y: 0, 
+      opacity: 1,
+      transition: { type: "spring", stiffness: 300, damping: 24 }
+    }
+  };
+  
   const cardVariants = {
     hidden: { opacity: 0, y: 20 },
     visible: (i: number) => ({
@@ -110,7 +159,13 @@ const Index = () => {
             // Update weather data
             setWeatherData({
               temperature: Math.round(data.main.temp),
-              condition: data.weather[0].main
+              condition: data.weather[0].main,
+              forecast: [
+                { day: 'Today', temp: `${Math.round(data.main.temp)}°/${Math.round(data.main.temp_min)}°`, condition: data.weather[0].main },
+                { day: 'Tomorrow', temp: `${Math.round(data.main.temp)-2}°/${Math.round(data.main.temp_min)-1}°`, condition: 'Partly Cloudy' },
+                { day: 'Wed', temp: `${Math.round(data.main.temp)-4}°/${Math.round(data.main.temp_min)-2}°`, condition: 'Light Rain' },
+                { day: 'Thu', temp: `${Math.round(data.main.temp)-1}°/${Math.round(data.main.temp_min)-3}°`, condition: 'Windy' },
+              ]
             });
           }
         } catch (error) {
@@ -207,15 +262,43 @@ const Index = () => {
     if (file) {
       // Convert file to base64 and store in sessionStorage
       const reader = new FileReader();
+      
       reader.onload = () => {
-        const imageData = reader.result as string;
-        // Store the image data and analysis type in sessionStorage
-        sessionStorage.setItem('uploadedImage', imageData);
-        sessionStorage.setItem('analysisType', 'disease'); // Default to disease analysis
-        
-        // Navigate to the disease scan page
+        try {
+          const imageData = reader.result as string;
+          
+          // Store the image data and analysis type in sessionStorage
+          // Use try/catch to handle potential sessionStorage errors
+          try {
+            sessionStorage.setItem('uploadedImage', imageData);
+            sessionStorage.setItem('analysisType', 'disease'); // Default to disease analysis
+            
+            // Small delay to ensure storage is complete before navigation
+            setTimeout(() => {
+              // Navigate to the disease scan page with an absolute path to avoid relative path issues on mobile
+              const targetPath = window.location.origin + '/disease-scan';
+              window.location.href = targetPath;
+            }, 100);
+          } catch (storageError) {
+            console.error('SessionStorage error:', storageError);
+            // Fallback - navigate directly without storage
+            navigate('/disease-scan');
+          }
+        } catch (error) {
+          console.error('Error processing image:', error);
+          toast({
+            title: "Error",
+            description: "Failed to process the image. Please try again.",
+            variant: "destructive"
+          });
+        }
+      };
+      
+      reader.onerror = () => {
+        console.error('FileReader error');
         navigate('/disease-scan');
       };
+      
       reader.readAsDataURL(file);
     }
   };
@@ -227,40 +310,62 @@ const Index = () => {
     
     return (
       <motion.div 
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ delay: 0.2 }}
-        className="bg-white rounded-xl shadow-md p-4 mb-6 border border-gray-100"
+        variants={containerVariants}
+        initial="hidden"
+        animate="visible"
+        className="mb-8 bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden"
       >
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="font-medium text-gray-700">{t('dashboard.farmActivityStatus')}</h3>
-          <span className="text-xs text-agri-green bg-agri-green/10 px-2 py-1 rounded-full">{t('common.active')}</span>
+        <div className="flex items-center justify-between p-5 border-b border-gray-100">
+          <h3 className="font-medium text-gray-800">{t('dashboard.farmActivityStatus')}</h3>
+          <Badge variant="outline" className="text-agri-green border-agri-green/30 bg-agri-green/10">
+            {t('common.active')}
+          </Badge>
         </div>
         
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <div className="flex flex-col items-center justify-center p-3 bg-agri-freshGreen/10 rounded-lg">
-            <Droplets className="h-6 w-6 text-agri-blue mb-2" />
-            <span className="text-xs text-gray-500">{t('dashboard.irrigation')}</span>
-            <span className="font-medium text-sm">{t('common.last')}: {t('common.today')}</span>
-          </div>
+        <div className="grid grid-cols-2 sm:grid-cols-4 divide-x divide-y sm:divide-y-0 divide-gray-100">
+          <motion.div 
+            variants={itemVariants}
+            className="flex flex-col items-center justify-center p-5"
+          >
+            <div className="bg-agri-blue/10 rounded-full p-2 mb-3">
+              <Droplets className="h-5 w-5 text-agri-blue" />
+            </div>
+            <span className="text-sm text-gray-500 mb-1">{t('dashboard.irrigation')}</span>
+            <span className="font-medium">{t('common.last')}: {t('common.today')}</span>
+          </motion.div>
           
-          <div className="flex flex-col items-center justify-center p-3 bg-agri-lime/10 rounded-lg">
-            <Leaf className="h-6 w-6 text-agri-freshGreen mb-2" />
-            <span className="text-xs text-gray-500">{t('dashboard.cropsHealth')}</span>
-            <span className="font-medium text-sm">{t('common.good')}</span>
-          </div>
+          <motion.div 
+            variants={itemVariants}
+            className="flex flex-col items-center justify-center p-5"
+          >
+            <div className="bg-agri-freshGreen/10 rounded-full p-2 mb-3">
+              <Leaf className="h-5 w-5 text-agri-freshGreen" />
+            </div>
+            <span className="text-sm text-gray-500 mb-1">{t('dashboard.cropsHealth')}</span>
+            <span className="font-medium">{t('common.good')}</span>
+          </motion.div>
           
-          <div className="flex flex-col items-center justify-center p-3 bg-agri-soil/10 rounded-lg">
-            <Tractor className="h-6 w-6 text-agri-soil mb-2" />
-            <span className="text-xs text-gray-500">{t('dashboard.lastPlowed')}</span>
-            <span className="font-medium text-sm">{t('common.daysAgo', { count: 3 })}</span>
-          </div>
+          <motion.div 
+            variants={itemVariants}
+            className="flex flex-col items-center justify-center p-5"
+          >
+            <div className="bg-agri-soil/10 rounded-full p-2 mb-3">
+              <Tractor className="h-5 w-5 text-agri-soil" />
+            </div>
+            <span className="text-sm text-gray-500 mb-1">{t('dashboard.lastPlowed')}</span>
+            <span className="font-medium">{t('common.daysAgo', { count: 3 })}</span>
+          </motion.div>
           
-          <div className="flex flex-col items-center justify-center p-3 bg-agri-tomato/10 rounded-lg">
-            <Pill className="h-6 w-6 text-agri-tomato mb-2" />
-            <span className="text-xs text-gray-500">{t('dashboard.lastTreatment')}</span>
-            <span className="font-medium text-sm">{t('common.weekAgo', { count: 1 })}</span>
-          </div>
+          <motion.div 
+            variants={itemVariants}
+            className="flex flex-col items-center justify-center p-5"
+          >
+            <div className="bg-agri-tomato/10 rounded-full p-2 mb-3">
+              <Pill className="h-5 w-5 text-agri-tomato" />
+            </div>
+            <span className="text-sm text-gray-500 mb-1">{t('dashboard.lastTreatment')}</span>
+            <span className="font-medium">{t('common.weekAgo', { count: 1 })}</span>
+          </motion.div>
         </div>
       </motion.div>
     );
@@ -269,18 +374,26 @@ const Index = () => {
   // Dashboard controls for tabs and view mode
   const renderDashboardControls = () => {
     return (
-      <div className="flex flex-col md:flex-row md:items-center justify-between mb-6 gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-6 gap-4">
         <Tabs 
           defaultValue="overview" 
           value={activeTab} 
           onValueChange={(value) => setActiveTab(value)}
-          className="w-full md:w-auto"
+          className="w-full sm:w-auto"
         >
-          <TabsList className="bg-white border border-gray-200 p-1">
-            <TabsTrigger value="overview" className="data-[state=active]:bg-agri-green data-[state=active]:text-white">Overview</TabsTrigger>
-            <TabsTrigger value="soil" className="data-[state=active]:bg-agri-soil data-[state=active]:text-white">Soil Health</TabsTrigger>
-            <TabsTrigger value="crops" className="data-[state=active]:bg-agri-freshGreen data-[state=active]:text-white">Crops</TabsTrigger>
-            <TabsTrigger value="market" className="data-[state=active]:bg-agri-amber data-[state=active]:text-white">Market</TabsTrigger>
+          <TabsList className="bg-white border border-gray-200 p-1 w-full sm:w-auto grid grid-cols-4 sm:flex">
+            <TabsTrigger value="overview" className="data-[state=active]:bg-agri-green data-[state=active]:text-white">
+              {t('common.overview')}
+            </TabsTrigger>
+            <TabsTrigger value="soil" className="data-[state=active]:bg-agri-soil data-[state=active]:text-white">
+              {t('dashboard.soil')}
+            </TabsTrigger>
+            <TabsTrigger value="crops" className="data-[state=active]:bg-agri-freshGreen data-[state=active]:text-white">
+              {t('dashboard.crops')}
+            </TabsTrigger>
+            <TabsTrigger value="market" className="data-[state=active]:bg-agri-amber data-[state=active]:text-white">
+              {t('dashboard.market')}
+            </TabsTrigger>
           </TabsList>
         </Tabs>
         
@@ -317,64 +430,21 @@ const Index = () => {
               </Label>
             </div>
           </RadioGroup>
-          
-          <Button 
-            variant="outline" 
-            size="sm" 
-            onClick={refreshUserData}
-            className="text-gray-700"
-          >
-            {t('common.refresh')}
-          </Button>
         </div>
       </div>
     );
   };
   
-  // Simplified card component without motion for stability
-  const renderCard = (index: number, title: string, icon: React.ReactNode, color: string, children: React.ReactNode) => {
-    return (
-      <div
-        className={`bg-white border border-gray-100 rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-shadow duration-300`}
-      >
-        <div className={`p-4 border-b ${color}`}>
-          <div className="flex items-center justify-between">
-            <h3 className="font-medium text-gray-800">{title}</h3>
-            <div className="rounded-full bg-white/90 backdrop-blur-sm p-1.5">
-              {icon}
-            </div>
-          </div>
-        </div>
-        <div className="p-4">
-          {children}
-        </div>
-      </div>
-    );
-  };
-  
-  return (
-    <MainLayout>
-      <WelcomeBanner 
-        userName={userName}
-        temperature={weatherData.temperature}
-        weatherCondition={weatherData.condition}
-        location={userLocation}
-      />
-      
-      {renderFarmStatus()}
-      
-      {renderDashboardControls()}
-      
-      <div className={cn(
-        "gap-6 mb-8",
-        viewMode === 'grid' ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3" : "space-y-6"
-      )}>
-        {/* Soil Health Card */}
-        {renderCard(
-          0,
-          t('soilLab.title'),
-          <Droplets className="h-5 w-5 text-agri-blue" />,
-          "bg-gradient-to-r from-agri-soil/20 to-agri-clay/20",
+  // Render dashboard cards
+  const renderDashboardCards = () => {
+    // Define cards data
+    const cards = [
+      {
+        id: 'soil',
+        title: t('soilLab.title'),
+        icon: <Droplets className="h-5 w-5 text-agri-blue" />,
+        gradient: "from-agri-soil/20 to-agri-clay/20",
+        content: (
           <div>
             <div className="flex items-center justify-between mb-4">
               <div>
@@ -412,20 +482,25 @@ const Index = () => {
               ))}
             </div>
             
-            <Button variant="link" size="sm" className="mt-4 text-agri-soil p-0">
-              View Full Report
+            <Button 
+              variant="link" 
+              size="sm" 
+              className="mt-4 text-agri-soil p-0"
+              onClick={() => navigate('/soil-lab')}
+            >
+              {t('common.viewFullReport')}
             </Button>
           </div>
-        )}
-        
-        {/* Crop Recommendations Card */}
-        {renderCard(
-          1,
-          "Crop Recommendations",
-          <Sprout className="h-5 w-5 text-agri-freshGreen" />,
-          "bg-gradient-to-r from-agri-freshGreen/20 to-agri-lime/20",
+        )
+      },
+      {
+        id: 'crops',
+        title: t('cropAdvisor.title'),
+        icon: <Sprout className="h-5 w-5 text-agri-freshGreen" />,
+        gradient: "from-agri-freshGreen/20 to-agri-lime/20",
+        content: (
           <div>
-            <div className="text-xs text-gray-500 mb-3">Top recommendations based on soil & climate</div>
+            <div className="text-xs text-gray-500 mb-3">{t('cropAdvisor.recommendation')}</div>
             
             {[
               { name: 'Rice', confidence: 92, yield: '5.8 tons/ha' },
@@ -448,30 +523,35 @@ const Index = () => {
                     <span className="font-medium">{crop.name}</span>
                     <span className="text-sm text-agri-green">{crop.confidence}%</span>
                   </div>
-                  <div className="text-xs text-gray-500">Est. yield: {crop.yield}</div>
+                  <div className="text-xs text-gray-500">{t('cropAdvisor.estYield')}: {crop.yield}</div>
                 </div>
               </div>
             ))}
             
-            <Button variant="outline" size="sm" className="w-full mt-2 text-agri-freshGreen border-agri-freshGreen/30 hover:bg-agri-freshGreen/10">
-              Get Detailed Analysis
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="w-full mt-2 text-agri-freshGreen border-agri-freshGreen/30 hover:bg-agri-freshGreen/10"
+              onClick={() => navigate('/crop-advisor')}
+            >
+              {t('cropAdvisor.getAnalysis')}
             </Button>
           </div>
-        )}
-        
-        {/* Disease Detection Card */}
-        {renderCard(
-          2,
-          "Disease Detection",
-          <Eye className="h-5 w-5 text-agri-tomato" />,
-          "bg-gradient-to-r from-agri-tomato/20 to-agri-orange/20",
+        )
+      },
+      {
+        id: 'disease',
+        title: t('diseaseScan.title'),
+        icon: <Eye className="h-5 w-5 text-agri-tomato" />,
+        gradient: "from-agri-tomato/20 to-agri-orange/20",
+        content: (
           <div className="text-center py-4">
             <div className="mb-4">
               <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-agri-tomato/10 text-agri-tomato mb-2">
                 <Scan className="h-8 w-8" />
               </div>
-              <h3 className="font-medium">Scan Crop Images for Diseases</h3>
-              <p className="text-sm text-gray-500 mt-1">Upload photos of your crops to detect diseases</p>
+              <h3 className="font-medium">{t('diseaseScan.scanCrops')}</h3>
+              <p className="text-sm text-gray-500 mt-1">{t('diseaseScan.uploadPhotos')}</p>
             </div>
             
             {/* Hidden file input */}
@@ -489,13 +569,13 @@ const Index = () => {
                 onClick={handleUploadClick}
               >
                 <Upload className="mr-2 h-4 w-4" />
-                Upload Images
+                {t('diseaseScan.uploadImages')}
               </Button>
 
               <label htmlFor="disease-camera-capture">
                 <Button className="bg-agri-blue hover:bg-agri-blue/90">
                   <Camera className="mr-2 h-4 w-4" />
-                  Take Photo
+                  {t('diseaseScan.takePhoto')}
                 </Button>
                 <input
                   id="disease-camera-capture"
@@ -508,18 +588,18 @@ const Index = () => {
               </label>
             </div>
           </div>
-        )}
-        
-        {/* Market Prices Card */}
-        {renderCard(
-          3,
-          "Market Prices",
-          <BarChart4 className="h-5 w-5 text-agri-amber" />,
-          "bg-gradient-to-r from-agri-amber/20 to-agri-gold/20",
+        )
+      },
+      {
+        id: 'market',
+        title: t('market.title'),
+        icon: <BarChart4 className="h-5 w-5 text-agri-amber" />,
+        gradient: "from-agri-amber/20 to-agri-gold/20",
+        content: (
           <div>
             <div className="flex justify-between items-center mb-3 text-sm">
-              <span className="text-gray-500">Commodity</span>
-              <span className="text-gray-500">Current Price</span>
+              <span className="text-gray-500">{t('market.commodity')}</span>
+              <span className="text-gray-500">{t('market.currentPrice')}</span>
             </div>
             
             {[
@@ -543,24 +623,24 @@ const Index = () => {
             ))}
             
             <div className="text-xs text-gray-500 mt-3 text-right">
-              Last updated: Today at 8:30 AM
+              {t('market.lastUpdated')}: {t('common.todayAt', { time: '8:30 AM' })}
             </div>
           </div>
-        )}
-        
-        {/* Weather Forecast Card */}
-        {renderCard(
-          4,
-          t('dashboard.weatherForecast'),
-          <CloudSun className="h-5 w-5 text-agri-lightBlue" />,
-          "bg-gradient-to-r from-agri-lightBlue/20 to-agri-blue/20",
+        )
+      },
+      {
+        id: 'weather',
+        title: t('dashboard.weatherForecast'),
+        icon: <CloudSun className="h-5 w-5 text-agri-lightBlue" />,
+        gradient: "from-agri-lightBlue/20 to-agri-blue/20",
+        content: (
           <div>
             <div className="flex flex-wrap -mx-2">
               {[
-                { day: 'Today', icon: <Sun className="h-5 w-5 text-agri-yellow" />, temp: '32°/27°', desc: 'Sunny' },
-                { day: 'Tomorrow', icon: <CloudSun className="h-5 w-5 text-agri-blue" />, temp: '30°/26°', desc: 'Partly Cloudy' },
-                { day: 'Wed', icon: <Droplets className="h-5 w-5 text-agri-lightBlue" />, temp: '28°/25°', desc: 'Light Rain' },
-                { day: 'Thu', icon: <Wind className="h-5 w-5 text-agri-slate" />, temp: '29°/24°', desc: 'Windy' },
+                { day: t('common.today'), icon: <Sun className="h-5 w-5 text-agri-yellow" />, temp: '32°/27°', desc: t('weather.sunny') },
+                { day: t('common.tomorrow'), icon: <CloudSun className="h-5 w-5 text-agri-blue" />, temp: '30°/26°', desc: t('weather.partlyCloudy') },
+                { day: t('common.wednesday'), icon: <Droplets className="h-5 w-5 text-agri-lightBlue" />, temp: '28°/25°', desc: t('weather.lightRain') },
+                { day: t('common.thursday'), icon: <Wind className="h-5 w-5 text-agri-slate" />, temp: '29°/24°', desc: t('weather.windy') },
               ].map((day, i) => (
                 <div key={i} className="w-1/2 sm:w-1/4 px-2 mb-4">
                   <div className="text-center p-2 rounded-lg hover:bg-gray-50">
@@ -573,20 +653,20 @@ const Index = () => {
               ))}
             </div>
             
-            <div className="mt-2 pt-3 border-t border-gray-100 flex items-center justify-between text-xs text-gray-500">
-              <span>Precipitation: 20%</span>
-              <span>Humidity: 68%</span>
-              <span>Wind: 12 km/h</span>
+            <div className="mt-2 pt-3 border-t border-gray-100 flex flex-wrap justify-between text-xs text-gray-500 gap-2">
+              <span>{t('weather.precipitation')}: 20%</span>
+              <span>{t('weather.humidity')}: 68%</span>
+              <span>{t('weather.wind')}: 12 km/h</span>
             </div>
           </div>
-        )}
-        
-        {/* Irrigation Planner Card */}
-        {renderCard(
-          5,
-          t('dashboard.irrigation'),
-          <Droplets className="h-5 w-5 text-agri-teal" />,
-          "bg-gradient-to-r from-agri-teal/20 to-agri-lightBlue/20",
+        )
+      },
+      {
+        id: 'irrigation',
+        title: t('dashboard.irrigation'),
+        icon: <Droplets className="h-5 w-5 text-agri-teal" />,
+        gradient: "from-agri-teal/20 to-agri-lightBlue/20",
+        content: (
           <div>
             <div className="flex items-center justify-between mb-4">
               <div>
@@ -611,7 +691,7 @@ const Index = () => {
             </div>
             
             <div className="mt-5 grid grid-cols-7 gap-1 text-center text-xs">
-              {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((day, i) => (
+              {[t('common.mon'), t('common.tue'), t('common.wed'), t('common.thu'), t('common.fri'), t('common.sat'), t('common.sun')].map((day, i) => (
                 <div key={i} className="space-y-1">
                   <div>{day}</div>
                   <div className={cn(
@@ -624,8 +704,165 @@ const Index = () => {
               ))}
             </div>
           </div>
-        )}
+        )
+      },
+      {
+        id: 'global-news',
+        title: t('dashboard.globalTrends'),
+        icon: <Globe className="h-5 w-5 text-agri-slate" />,
+        gradient: "from-agri-slate/20 to-agri-darkGreen/20",
+        content: (
+          <div>
+            <div className="space-y-3">
+              {globalAgriNews.map((news, i) => (
+                <div key={i} className="flex gap-3 p-2 hover:bg-gray-50 rounded-lg cursor-pointer">
+                  <div className={`flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center 
+                    ${news.category === 'Market' ? 'bg-agri-amber/10 text-agri-amber' : 
+                      news.category === 'Innovation' ? 'bg-agri-blue/10 text-agri-blue' : 
+                      'bg-agri-tomato/10 text-agri-tomato'}`}
+                  >
+                    {news.category === 'Market' ? <BarChart4 className="h-5 w-5" /> : 
+                     news.category === 'Innovation' ? <Leaf className="h-5 w-5" /> : 
+                     <Flame className="h-5 w-5" />}
+                  </div>
+                  <div>
+                    <div className="text-sm font-medium line-clamp-2">{news.title}</div>
+                    <div className="flex items-center mt-1">
+                      <Badge variant="outline" className="mr-2 text-xs px-1.5 py-0 h-4">
+                        {news.category}
+                      </Badge>
+                      <span className="text-xs text-gray-500">{news.date}</span>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+            
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="w-full mt-4"
+              onClick={() => navigate('/news')}
+            >
+              <Newspaper className="h-4 w-4 mr-2" />
+              {t('dashboard.viewAllNews')}
+            </Button>
+          </div>
+        )
+      },
+    ];
+
+    // Filter cards based on active tab
+    let filteredCards = [...cards];
+    
+    if (activeTab === 'soil') {
+      filteredCards = cards.filter(card => ['soil', 'irrigation'].includes(card.id));
+    } else if (activeTab === 'crops') {
+      filteredCards = cards.filter(card => ['crops', 'disease'].includes(card.id));
+    } else if (activeTab === 'market') {
+      filteredCards = cards.filter(card => ['market', 'global-news'].includes(card.id));
+    }
+
+    // Function to render a card
+    const renderCard = (card: any, index: number) => {
+      return (
+        <motion.div
+          key={card.id}
+          custom={index}
+          variants={cardVariants}
+          initial="hidden"
+          animate="visible"
+          className="bg-white border border-gray-100 rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-shadow duration-300"
+        >
+          <div className={`p-4 border-b bg-gradient-to-r ${card.gradient}`}>
+            <div className="flex items-center justify-between">
+              <h3 className="font-medium text-gray-800">{card.title}</h3>
+              <div className="rounded-full bg-white/90 backdrop-blur-sm p-1.5">
+                {card.icon}
+              </div>
+            </div>
+          </div>
+          <div className="p-4">
+            {card.content}
+          </div>
+        </motion.div>
+      );
+    };
+
+    return (
+      <div className={cn(
+        "gap-6 mb-8",
+        viewMode === 'grid' ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3" : "space-y-6"
+      )}>
+        {filteredCards.map((card, index) => renderCard(card, index))}
       </div>
+    );
+  };
+  
+  // Loading skeleton for the dashboard
+  const renderLoadingSkeleton = () => {
+    return (
+      <div className="space-y-6">
+        <div className="rounded-2xl overflow-hidden bg-white shadow-sm">
+          <Skeleton className="h-48 w-full" />
+        </div>
+        
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+          {[1, 2, 3, 4].map(i => (
+            <div key={i} className="bg-white rounded-xl shadow-sm p-4">
+              <Skeleton className="h-10 w-10 rounded-lg mb-3" />
+              <Skeleton className="h-5 w-3/4 mb-2" />
+              <Skeleton className="h-4 w-full" />
+            </div>
+          ))}
+        </div>
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {[1, 2, 3, 4, 5, 6].map(i => (
+            <div key={i} className="bg-white rounded-xl shadow-sm overflow-hidden">
+              <Skeleton className="h-12 w-full" />
+              <div className="p-4 space-y-3">
+                <Skeleton className="h-4 w-full" />
+                <Skeleton className="h-4 w-full" />
+                <Skeleton className="h-4 w-3/4" />
+                <Skeleton className="h-8 w-full mt-4" />
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  };
+  
+  return (
+    <MainLayout>
+      {isLoading ? (
+        renderLoadingSkeleton()
+      ) : (
+        <div className="animate-fadeIn">
+          <WelcomeBanner 
+            userName={userName}
+            temperature={weatherData.temperature}
+            weatherCondition={weatherData.condition}
+            location={userLocation}
+          />
+          
+          {renderFarmStatus()}
+          
+          {renderDashboardControls()}
+          
+          {renderDashboardCards()}
+          
+          {/* Hidden file input for disease detection uploads */}
+          <input
+            type="file"
+            ref={fileInputRef}
+            onChange={handleFileChange}
+            accept="image/*"
+            className="hidden"
+          />
+        </div>
+      )}
     </MainLayout>
   );
 };
