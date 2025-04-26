@@ -12,7 +12,8 @@ import {
   ChevronRight,
   Users,
   PanelLeftClose,
-  PanelLeftOpen
+  PanelLeftOpen,
+  MapPin
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import './sidebar.css';
@@ -42,6 +43,13 @@ const sidebarItems: SidebarItem[] = [
     href: '/dashboard',
     color: 'bg-agri-green/10 text-agri-green',
     translationKey: 'common.dashboard'
+  },
+  { 
+    name: 'Farm', 
+    icon: MapPin, 
+    href: '/farm',
+    color: 'bg-agri-green/10 text-agri-green',
+    translationKey: 'common.farm'
   },
   { 
     name: 'Soil Lab', 

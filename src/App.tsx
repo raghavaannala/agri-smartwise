@@ -18,6 +18,7 @@ import Market from "./pages/Market";
 import Weather from "./pages/Weather";
 import AgriBot from "./pages/AgriBot";
 import Founders from "./pages/Founders";
+import Farm from "./pages/Farm";
 import { AuthProvider } from "./contexts/AuthContext";
 import { LanguageProvider } from "./contexts/LanguageContext";
 import ProtectedRoute from "./components/auth/ProtectedRoute";
@@ -67,6 +68,7 @@ const App = () => (
               <Route path="/weather" element={<Weather />} />
               <Route path="/agribot" element={<AgriBot />} />
               <Route path="/founders" element={<Founders />} />
+              <Route path="/farm" element={<Farm />} />
               
               {/* Authentication routes */}
               <Route path="/login" element={<Login />} />

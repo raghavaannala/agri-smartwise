@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Scan, Upload, AlertTriangle, Loader2, Droplets, Bug, Leaf } from 'lucide-react';
+import { Scan, Upload, AlertTriangle, Loader2, Droplets, Bug, Leaf, Camera } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { analyzeCropDisease, analyzeSoil, analyzePestImage } from '@/services/geminiService';
 import { useToast } from '@/components/ui/use-toast';
@@ -233,35 +233,61 @@ const DiseaseDetectionCard = ({ initialImage = null, initialAnalysisType = 'dise
 
   const renderUploadSection = () => {
     return (
-      <div className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-gray-300 rounded-lg bg-gray-50">
-        <Upload className="h-8 w-8 text-gray-400 mb-2" />
-        <p className="text-sm text-gray-500 mb-4 text-center">
-          {activeTab === 'disease' && t('diseaseScan.uploadImageForDiseaseDetection')}
-          {activeTab === 'soil' && t('soilAnalysis.uploadImageForSoilAnalysis')}
-          {activeTab === 'pesticide' && t('pestAnalysis.uploadImageForPestAnalysis')}
+      <div className="flex flex-col items-center justify-center space-y-4 p-4 border border-dashed border-gray-300 rounded-lg">
+        <div className="w-16 h-16 rounded-full bg-green-50 flex items-center justify-center">
+          {activeTab === 'disease' && <Leaf className="h-8 w-8 text-agri-green" />}
+          {activeTab === 'soil' && <Leaf className="h-8 w-8 text-agri-soil" />}
+          {activeTab === 'pesticide' && <AlertTriangle className="h-8 w-8 text-amber-500" />}
+        </div>
+        <p className="text-center text-sm text-gray-500">
+          {t('diseaseScan.uploadMessage')}
         </p>
-        <label htmlFor="image-upload">
-          <div className="relative inline-block">
-            <Button className="bg-agri-green hover:bg-agri-green/90" disabled={isAnalyzing}>
-              {isAnalyzing ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  {t('diseaseScan.analyzingWithAI')}
-                </>
-              ) : (
-                t('diseaseScan.uploadImage')
-              )}
-            </Button>
-            <input
-              id="image-upload"
-              type="file"
-              accept="image/*"
-              className="absolute inset-0 opacity-0 cursor-pointer"
-              onChange={handleImageUpload}
-              disabled={isAnalyzing}
-            />
-          </div>
-        </label>
+        
+        <div className="flex flex-wrap gap-2 justify-center">
+          <label htmlFor="image-upload">
+            <div className="relative inline-block">
+              <Button className="bg-agri-green hover:bg-agri-green/90" disabled={isAnalyzing}>
+                {isAnalyzing ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    {t('diseaseScan.analyzingWithAI')}
+                  </>
+                ) : (
+                  <>
+                    <Upload className="mr-2 h-4 w-4" />
+                    {t('diseaseScan.uploadImage')}
+                  </>
+                )}
+              </Button>
+              <input
+                id="image-upload"
+                type="file"
+                accept="image/*"
+                className="absolute inset-0 opacity-0 cursor-pointer"
+                onChange={handleImageUpload}
+                disabled={isAnalyzing}
+              />
+            </div>
+          </label>
+
+          <label htmlFor="camera-capture">
+            <div className="relative inline-block">
+              <Button className="bg-agri-blue hover:bg-agri-blue/90" disabled={isAnalyzing}>
+                <Camera className="mr-2 h-4 w-4" />
+                {t('diseaseScan.takePhoto')}
+              </Button>
+              <input
+                id="camera-capture"
+                type="file"
+                accept="image/*"
+                capture="environment"
+                className="absolute inset-0 opacity-0 cursor-pointer"
+                onChange={handleImageUpload}
+                disabled={isAnalyzing}
+              />
+            </div>
+          </label>
+        </div>
       </div>
     );
   };

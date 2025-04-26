@@ -34,7 +34,11 @@
     "active": "క్రియాశీలక",
     "last": "చివరిది",
     "daysAgo": "{{count}} రోజుల క్రితం",
-    "weekAgo": "{{count}} వారం క్రితం"
+    "weekAgo": "{{count}} వారం క్రితం",
+    "refreshing": "రిఫ్రెష్ అవుతోంది...",
+    "diseaseScan": "వ్యాధి స్కాన్",
+    "cropAdvisor": "పంట సలహాదారు",
+    "farm": "పొలం"
   },
   "founders": {
     "title": "మా వ్యవస్థాపకులను కలవండి",
@@ -58,7 +62,13 @@
     "recentActivity": "ఇటీవలి కార్యకలాపం",
     "soilHealth": "మట్టి ఆరోగ్యం",
     "cropStatus": "పంట స్థితి",
-    "tasks": "పనులు"
+    "tasks": "పనులు",
+    "farmActivityStatus": "వ్యవసాయ కార్యకలాపాల స్థితి",
+    "irrigation": "నీటిపారుదల",
+    "cropsHealth": "పంటల ఆరోగ్యం",
+    "lastPlowed": "చివరిగా దున్నిన సమయం",
+    "lastTreatment": "చివరి చికిత్స",
+    "settings": "సెట్టింగ్‌లు"
   },
   "soilLab": {
     "title": "మట్టి ప్రయోగశాల",

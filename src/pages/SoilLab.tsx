@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter }
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Droplets, Upload, Loader2, AlertTriangle, Check, Info, FlaskConical, Leaf } from 'lucide-react';
+import { Droplets, Upload, Loader2, AlertTriangle, Check, Info, FlaskConical, Leaf, Camera } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 import { motion } from 'framer-motion';
 import { analyzeSoil } from '@/services/geminiService';
@@ -231,6 +231,7 @@ const SoilLab = () => {
               id="soil-image-upload"
               type="file"
               accept="image/*"
+              capture="environment"
               className="absolute inset-0 opacity-0 cursor-pointer"
               onChange={handleImageUpload}
               disabled={isAnalyzing}
@@ -370,26 +371,49 @@ const SoilLab = () => {
                   ref={fileInputRef}
                   className="hidden"
                   accept="image/*"
+                  capture="environment"
                   onChange={handleImageUpload}
                 />
               </div>
               
-              <Button 
-                className="w-full mt-4 bg-agri-soil hover:bg-agri-soil/90"
-                disabled={!selectedImage || isAnalyzing}
-                onClick={handleAnalyzeButtonClick}
-              >
-                {isAnalyzing ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    {t('soilLab.analyzing')}...
-                  </>
-                ) : (
-                  <>
-                    {t('soilLab.analyzeNow')}
-                  </>
-                )}
-              </Button>
+              <div className="flex gap-2 mt-4">
+                <Button 
+                  className="flex-1 bg-agri-soil hover:bg-agri-soil/90"
+                  disabled={!selectedImage || isAnalyzing}
+                  onClick={handleAnalyzeButtonClick}
+                >
+                  {isAnalyzing ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      {t('soilLab.analyzing')}...
+                    </>
+                  ) : (
+                    <>
+                      {t('soilLab.analyzeNow')}
+                    </>
+                  )}
+                </Button>
+                
+                <label htmlFor="camera-capture-soil">
+                  <Button 
+                    className="bg-agri-blue hover:bg-agri-blue/90" 
+                    disabled={isAnalyzing}
+                    type="button"
+                  >
+                    <Camera className="mr-2 h-4 w-4" />
+                    {t('soilLab.takeSoilPhoto')}
+                  </Button>
+                  <input
+                    id="camera-capture-soil"
+                    type="file"
+                    accept="image/*" 
+                    capture="environment"
+                    className="hidden"
+                    onChange={handleImageUpload}
+                    disabled={isAnalyzing}
+                  />
+                </label>
+              </div>
             </CardContent>
           </Card>
           

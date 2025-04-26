@@ -5,6 +5,7 @@ import { getUserProfile } from '@/lib/firestore';
 import { motion } from 'framer-motion';
 import { useLocation } from '../../hooks/useLocation';
 import { getCurrentWeather } from '../../services/weatherService';
+import { useNavigate } from 'react-router-dom';
 
 type WelcomeBannerProps = {
   userName: string;
@@ -23,6 +24,7 @@ const WelcomeBanner: React.FC<WelcomeBannerProps> = ({
   const isGuest = !currentUser || userName === 'Guest';
   const [profileName, setProfileName] = useState<string>(userName);
   const { location: geoLocation, loading: locationLoading, usingFallback } = useLocation();
+  const navigate = useNavigate();
   
   // States for live weather data
   const [locationFetching, setLocationFetching] = useState(false);
@@ -156,6 +158,11 @@ const WelcomeBanner: React.FC<WelcomeBannerProps> = ({
     night: 'from-agri-darkGreen via-agri-blue to-agri-eggplant'
   };
 
+  // Function to handle navigation to the farm page
+  const handleViewFarm = () => {
+    navigate('/farm');
+  };
+
   return (
     <motion.div 
       initial={{ y: -10, opacity: 0 }}
@@ -235,7 +242,10 @@ const WelcomeBanner: React.FC<WelcomeBannerProps> = ({
                 </span>
               </div>
               
-              <button className="flex items-center bg-white/10 hover:bg-white/20 backdrop-blur-sm px-4 py-2 rounded-lg transition-colors">
+              <button 
+                className="flex items-center bg-white/10 hover:bg-white/20 backdrop-blur-sm px-4 py-2 rounded-lg transition-colors"
+                onClick={handleViewFarm}
+              >
                 <span className="text-sm font-medium mr-1">View Farm</span>
                 <ArrowRight className="h-4 w-4" />
               </button>

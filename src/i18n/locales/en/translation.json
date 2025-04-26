@@ -14,6 +14,7 @@
     "logout": "Logout",
     "profile": "Profile",
     "settings": "Settings",
+    "farm": "Farm",
     "selectLanguage": "Select Language",
     "collapse": "Collapse",
     "active": "Active",
@@ -25,7 +26,10 @@
     "refresh": "Refresh",
     "yesterday": "Yesterday",
     "tomorrow": "Tomorrow",
-    "medium": "Medium"
+    "medium": "Medium",
+    "refreshing": "Refreshing...",
+    "diseaseScan": "Disease Scan",
+    "cropAdvisor": "Crop Advisor"
   },
   "founders": {
     "title": "Meet Our Founders",
@@ -49,7 +53,13 @@
     "recentActivity": "Recent Activity",
     "soilHealth": "Soil Health",
     "cropStatus": "Crop Status",
-    "tasks": "Tasks"
+    "tasks": "Tasks",
+    "farmActivityStatus": "Farm Activity Status",
+    "irrigation": "Irrigation",
+    "cropsHealth": "Crops Health",
+    "lastPlowed": "Last Plowed",
+    "lastTreatment": "Last Treatment",
+    "settings": "Settings"
   },
   "soilLab": {
     "title": "Soil Laboratory",
@@ -63,6 +73,7 @@
     "analyzeNow": "Analyze Now",
     "noAnalysisYet": "No Analysis Yet",
     "uploadSoilMessage": "Upload a soil sample image to get detailed analysis and recommendations",
+    "takeSoilPhoto": "Take Photo",
     "results": "Analysis Results",
     "analysisCompleted": "Your soil analysis has been completed",
     "nutrients": "Nutrients",
@@ -120,7 +131,7 @@
   },
   "diseaseScan": {
     "title": "Disease Scan",
-    "uploadImage": "Upload Plant Image",
+    "uploadImage": "Upload Image",
     "scanNow": "Scan Now",
     "results": "Scan Results",
     "detectedDisease": "Detected Disease",
@@ -128,6 +139,16 @@
     "description": "Description",
     "treatment": "Treatment",
     "prevention": "Prevention",
+    "uploadMessage": "Upload a clear photo of your plant for AI-powered disease detection",
+    "takePhoto": "Take Photo",
+    "fileTooLarge": "File Too Large",
+    "fileTooLargeDescription": "Please select an image smaller than 5MB",
+    "analyzingWithAI": "Analyzing with AI...",
+    "uploadImageForDiseaseDetection": "Upload an image of your plant for disease detection",
+    "uploadImageForSoilAnalysis": "Upload an image of your soil for analysis",
+    "uploadImageForPestAnalysis": "Upload an image for pest identification",
+    "diseaseAnalysisComplete": "Disease Analysis Complete",
+    "detected": "Detected",
     "howItWorks": {
       "title": "How Disease Scan Works",
       "description": "Our AI-powered disease detection system helps you identify plant diseases quickly and accurately. Follow these simple steps:",

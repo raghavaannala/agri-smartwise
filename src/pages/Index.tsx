@@ -28,7 +28,9 @@ import {
   LayoutGrid,
   LayoutList,
   Scan,
-  Loader
+  Loader,
+  Camera,
+  Upload
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
@@ -481,12 +483,30 @@ const Index = () => {
               className="hidden"
             />
             
-            <Button 
-              className="bg-agri-tomato hover:bg-agri-tomato/90"
-              onClick={handleUploadClick}
-            >
-              Upload Images
-            </Button>
+            <div className="flex flex-wrap justify-center gap-2">
+              <Button 
+                className="bg-agri-tomato hover:bg-agri-tomato/90"
+                onClick={handleUploadClick}
+              >
+                <Upload className="mr-2 h-4 w-4" />
+                Upload Images
+              </Button>
+
+              <label htmlFor="disease-camera-capture">
+                <Button className="bg-agri-blue hover:bg-agri-blue/90">
+                  <Camera className="mr-2 h-4 w-4" />
+                  Take Photo
+                </Button>
+                <input
+                  id="disease-camera-capture"
+                  type="file"
+                  accept="image/*"
+                  capture="environment"
+                  className="hidden"
+                  onChange={handleFileChange}
+                />
+              </label>
+            </div>
           </div>
         )}
         

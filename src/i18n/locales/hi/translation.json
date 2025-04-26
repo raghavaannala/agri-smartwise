@@ -25,7 +25,11 @@
     "refresh": "रीफ्रेश",
     "yesterday": "कल",
     "tomorrow": "आने वाला कल",
-    "medium": "मध्यम"
+    "medium": "मध्यम",
+    "refreshing": "रीफ्रेश हो रहा है...",
+    "diseaseScan": "रोग स्कैन",
+    "cropAdvisor": "फसल सलाहकार",
+    "farm": "खेत"
   },
   "founders": {
     "title": "हमारे संस्थापकों से मिलें",
@@ -49,7 +53,13 @@
     "recentActivity": "हाल की गतिविधि",
     "soilHealth": "मिट्टी स्वास्थ्य",
     "cropStatus": "फसल स्थिति",
-    "tasks": "कार्य"
+    "tasks": "कार्य",
+    "farmActivityStatus": "खेत गतिविधि स्थिति",
+    "irrigation": "सिंचाई",
+    "cropsHealth": "फसलों का स्वास्थ्य",
+    "lastPlowed": "अंतिम जुताई",
+    "lastTreatment": "अंतिम उपचार",
+    "settings": "सेटिंग्स"
   },
   "soilLab": {
     "title": "मिट्टी प्रयोगशाला",
