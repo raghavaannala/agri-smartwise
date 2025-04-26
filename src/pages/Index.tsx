@@ -27,7 +27,8 @@ import {
   PieChart,
   LayoutGrid,
   LayoutList,
-  Scan
+  Scan,
+  Loader
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
@@ -48,6 +49,8 @@ import {
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
+import { useLocation } from '../hooks/useLocation';
+import { getCurrentWeather } from '../services/weatherService';
 
 const Index = () => {
   const { currentUser } = useAuth();
@@ -62,6 +65,13 @@ const Index = () => {
   const [activeTab, setActiveTab] = useState('overview');
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const navigate = useNavigate();
+  
+  // Location and weather data
+  const { location, loading: locationLoading, usingFallback } = useLocation();
+  const [weatherData, setWeatherData] = useState({
+    temperature: 32,
+    condition: 'Sunny'
+  });
   
   // Reference to hidden file input
   const fileInputRef = React.useRef<HTMLInputElement>(null);
@@ -79,6 +89,36 @@ const Index = () => {
       }
     })
   };
+  
+  // Fetch location-based data
+  useEffect(() => {
+    const fetchLocationData = async () => {
+      if (location) {
+        try {
+          console.log(`Index fetching weather for: ${location.latitude}, ${location.longitude}`);
+          
+          const data = await getCurrentWeather(location.latitude, location.longitude);
+          console.log('Weather data received in Index:', data);
+          
+          if (data && data.name) {
+            // Format location with city and country
+            const locationDisplay = `${data.name}${data.sys.country ? ', ' + data.sys.country : ''}`;
+            setUserLocation(locationDisplay);
+            
+            // Update weather data
+            setWeatherData({
+              temperature: Math.round(data.main.temp),
+              condition: data.weather[0].main
+            });
+          }
+        } catch (error) {
+          console.error('Error fetching weather data in Index:', error);
+        }
+      }
+    };
+    
+    fetchLocationData();
+  }, [location]);
   
   const fetchUserProfile = async () => {
     setIsLoading(true);
@@ -101,8 +141,8 @@ const Index = () => {
           setUserName(userProfile.displayName);
         }
         
-        // Set user location
-        if (userProfile?.location) {
+        // Don't override location if already set by the weather API
+        if (userProfile?.location && !userLocation.includes(",")) {
           setUserLocation(userProfile.location);
         }
         
@@ -118,7 +158,9 @@ const Index = () => {
     } else {
       // Default for non-authenticated users
       setUserName('Guest');
-      setUserLocation('Tirupati, Andhra Pradesh');
+      if (!userLocation.includes(",")) {
+        setUserLocation('Tirupati, Andhra Pradesh');
+      }
       setIsAuthenticated(false);
       setIsLoading(false);
     }
@@ -312,8 +354,8 @@ const Index = () => {
     <MainLayout>
       <WelcomeBanner 
         userName={userName}
-        temperature={32}
-        weatherCondition="Sunny"
+        temperature={weatherData.temperature}
+        weatherCondition={weatherData.condition}
         location={userLocation}
       />
       

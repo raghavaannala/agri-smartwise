@@ -15,7 +15,17 @@
     "profile": "प्रोफाइल",
     "settings": "सेटिंग्स",
     "selectLanguage": "भाषा चुनें",
-    "collapse": "संकुचित करें"
+    "collapse": "संकुचित करें",
+    "active": "सक्रिय",
+    "good": "अच्छा",
+    "last": "अंतिम",
+    "today": "आज",
+    "daysAgo": "{{count}} दिन पहले",
+    "weekAgo": "{{count}} सप्ताह पहले",
+    "refresh": "रीफ्रेश",
+    "yesterday": "कल",
+    "tomorrow": "आने वाला कल",
+    "medium": "मध्यम"
   },
   "founders": {
     "title": "हमारे संस्थापकों से मिलें",

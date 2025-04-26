@@ -1,8 +1,10 @@
 import React, { useEffect, useState } from 'react';
-import { CloudSun, Droplets, Wind, Sun, Thermometer, Leaf, Map, ArrowRight } from 'lucide-react';
+import { CloudSun, Droplets, Wind, Sun, Thermometer, Leaf, Map, ArrowRight, Loader, MapPin } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { getUserProfile } from '@/lib/firestore';
 import { motion } from 'framer-motion';
+import { useLocation } from '../../hooks/useLocation';
+import { getCurrentWeather } from '../../services/weatherService';
 
 type WelcomeBannerProps = {
   userName: string;
@@ -13,13 +15,61 @@ type WelcomeBannerProps = {
 
 const WelcomeBanner: React.FC<WelcomeBannerProps> = ({
   userName,
-  temperature,
-  weatherCondition,
-  location
+  temperature: defaultTemperature,
+  weatherCondition: defaultCondition,
+  location: defaultLocation
 }) => {
   const { currentUser } = useAuth();
   const isGuest = !currentUser || userName === 'Guest';
   const [profileName, setProfileName] = useState<string>(userName);
+  const { location: geoLocation, loading: locationLoading, usingFallback } = useLocation();
+  
+  // States for live weather data
+  const [locationFetching, setLocationFetching] = useState(false);
+  const [realLocation, setRealLocation] = useState<string | null>(null);
+  const [weatherData, setWeatherData] = useState({
+    temperature: defaultTemperature,
+    condition: defaultCondition,
+    humidity: 68,
+    wind: 12,
+    feelsLike: defaultTemperature + 2
+  });
+  
+  // Fetch location-based weather data
+  useEffect(() => {
+    const fetchWeatherData = async () => {
+      if (geoLocation) {
+        try {
+          console.log(`WelcomeBanner fetching weather for: ${geoLocation.latitude}, ${geoLocation.longitude}`);
+          setLocationFetching(true);
+          
+          const data = await getCurrentWeather(geoLocation.latitude, geoLocation.longitude);
+          console.log('Weather data received in banner:', data);
+          
+          if (data && data.name) {
+            // Format location with city and country
+            const locationDisplay = `${data.name}${data.sys.country ? ', ' + data.sys.country : ''}`;
+            setRealLocation(locationDisplay);
+            
+            // Update weather data
+            setWeatherData({
+              temperature: Math.round(data.main.temp),
+              condition: data.weather[0].main,
+              humidity: data.main.humidity,
+              wind: Math.round(data.wind.speed * 3.6), // convert m/s to km/h
+              feelsLike: Math.round(data.main.feels_like)
+            });
+          }
+        } catch (error) {
+          console.error('Error fetching weather data in banner:', error);
+        } finally {
+          setLocationFetching(false);
+        }
+      }
+    };
+    
+    fetchWeatherData();
+  }, [geoLocation]);
   
   // Fetch the latest profile information directly when needed
   useEffect(() => {
@@ -87,13 +137,16 @@ const WelcomeBanner: React.FC<WelcomeBannerProps> = ({
   };
   
   const weatherIcon = () => {
-    const lowerCondition = weatherCondition.toLowerCase();
+    const lowerCondition = weatherData.condition.toLowerCase();
     if (lowerCondition.includes('rain')) return <Droplets className="text-agri-lightBlue" />;
     if (lowerCondition.includes('cloud')) return <CloudSun className="text-agri-slate" />;
     if (lowerCondition.includes('sun') || lowerCondition.includes('clear')) return <Sun className="text-agri-yellow" />;
     if (lowerCondition.includes('wind')) return <Wind className="text-agri-blue" />;
     return <CloudSun className="text-agri-lightBlue" />;
   };
+
+  // Get the location to display - prioritize real location from API
+  const displayLocation = realLocation || defaultLocation;
 
   const timeOfDay = getTimeOfDay();
   const bannerGradients = {
@@ -141,7 +194,7 @@ const WelcomeBanner: React.FC<WelcomeBannerProps> = ({
             <h1 className="text-2xl md:text-3xl font-bold mb-2 flex items-center">
               {isGuest 
                 ? "Welcome to SmartAgroX!" 
-                : `Welcome back, ${profileName || userName}! ${getWeatherEmoji(weatherCondition)}`
+                : `Welcome back, ${profileName || userName}! ${getWeatherEmoji(weatherData.condition)}`
               }
             </h1>
             <p className="text-white/90 max-w-xl leading-relaxed">
@@ -165,8 +218,21 @@ const WelcomeBanner: React.FC<WelcomeBannerProps> = ({
               </div>
               
               <div className="flex items-center bg-white/10 backdrop-blur-sm px-4 py-2 rounded-lg">
-                <Map className="h-4 w-4 mr-2 text-agri-sand" />
-                <span className="text-sm font-medium">{location}</span>
+                <MapPin className="h-4 w-4 mr-2 text-agri-sand" />
+                <span className="text-sm font-medium">
+                  {locationFetching ? (
+                    <span className="flex items-center">
+                      Loading location... <Loader className="h-3 w-3 ml-1 animate-spin" />
+                    </span>
+                  ) : displayLocation ? (
+                    <span>
+                      {displayLocation}
+                      {usingFallback && realLocation && <span className="ml-1 text-xs text-yellow-200">(Default)</span>}
+                    </span>
+                  ) : (
+                    defaultLocation
+                  )}
+                </span>
               </div>
               
               <button className="flex items-center bg-white/10 hover:bg-white/20 backdrop-blur-sm px-4 py-2 rounded-lg transition-colors">
@@ -189,10 +255,10 @@ const WelcomeBanner: React.FC<WelcomeBannerProps> = ({
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center">
                   {weatherIcon()}
-                  <span className="ml-2 font-semibold text-lg">{weatherCondition}</span>
+                  <span className="ml-2 font-semibold text-lg">{weatherData.condition}</span>
                 </div>
                 <div className="text-3xl font-bold flex items-start">
-                  {temperature}<span className="text-xl">°C</span>
+                  {weatherData.temperature}<span className="text-xl">°C</span>
                 </div>
               </div>
               
@@ -200,24 +266,24 @@ const WelcomeBanner: React.FC<WelcomeBannerProps> = ({
                 <div className="bg-white/10 rounded-lg p-2">
                   <Droplets className="h-4 w-4 mx-auto mb-1" />
                   <div className="text-xs font-medium">Humidity</div>
-                  <div className="text-sm">68%</div>
+                  <div className="text-sm">{weatherData.humidity}%</div>
                 </div>
                 
                 <div className="bg-white/10 rounded-lg p-2">
                   <Wind className="h-4 w-4 mx-auto mb-1" />
                   <div className="text-xs font-medium">Wind</div>
-                  <div className="text-sm">12 km/h</div>
+                  <div className="text-sm">{weatherData.wind} km/h</div>
                 </div>
                 
                 <div className="bg-white/10 rounded-lg p-2">
                   <Thermometer className="h-4 w-4 mx-auto mb-1" />
                   <div className="text-xs font-medium">Feels like</div>
-                  <div className="text-sm">{temperature + 2}°C</div>
+                  <div className="text-sm">{weatherData.feelsLike}°C</div>
                 </div>
               </div>
               
               <div className="text-center mt-3 text-xs text-white/70">
-                Today's forecast for {location}
+                Today's forecast for {displayLocation}
               </div>
             </div>
           </div>

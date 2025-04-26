@@ -26,7 +26,9 @@ import {
   ChevronRight,
   Minimize2,
   Maximize2,
-  ArrowRight
+  ArrowRight,
+  MapPin,
+  Loader
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
@@ -38,6 +40,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { useLocation } from '../hooks/useLocation';
+import { getCurrentWeather } from '../services/weatherService';
 
 // Component for compact dashboard layout
 const CompactDashboardLayout = (props: any) => {
@@ -63,6 +67,7 @@ const Dashboard = () => {
   const navigate = useNavigate();
   const { currentUser } = useAuth();
   const { t, i18n } = useTranslation();
+  const { location, loading: locationLoading, usingFallback } = useLocation();
   
   // Add a state variable to force re-renders when language changes
   const [currentLang, setCurrentLang] = useState(i18n.language);
@@ -85,6 +90,10 @@ const Dashboard = () => {
     };
   });
   
+  // Location-based states
+  const [userLocation, setUserLocation] = useState<string | null>(null);
+  const [locationFetching, setLocationFetching] = useState(false);
+  
   // Update when language changes
   useEffect(() => {
     const handleLanguageChanged = () => {
@@ -99,6 +108,63 @@ const Dashboard = () => {
       i18n.off('languageChanged', handleLanguageChanged);
     };
   }, [i18n]);
+
+  // Fetch location-based data when location changes
+  useEffect(() => {
+    const fetchLocationData = async () => {
+      if (location) {
+        try {
+          console.log(`Dashboard fetching weather data for: ${location.latitude}, ${location.longitude}`);
+          setLocationFetching(true);
+          
+          // Clear any previous location to show loading state
+          setUserLocation(null);
+          
+          const weatherData = await getCurrentWeather(location.latitude, location.longitude);
+          console.log('Weather data received:', weatherData);
+          
+          if (weatherData && weatherData.name) {
+            // Calculate a display name that includes city and country
+            const locationDisplay = `${weatherData.name}${weatherData.sys.country ? ', ' + weatherData.sys.country : ''}`;
+            console.log('Setting user location to:', locationDisplay);
+            
+            setUserLocation(locationDisplay);
+            
+            // Update weather data with real data
+            setWeatherData(prevData => ({
+              ...prevData,
+              temperature: Math.round(weatherData.main.temp),
+              condition: weatherData.weather[0].main,
+              humidity: weatherData.main.humidity,
+              wind: Math.round(weatherData.wind.speed * 3.6), // convert m/s to km/h
+              feelsLike: Math.round(weatherData.main.feels_like)
+            }));
+          } else {
+            console.error('Weather data missing name property:', weatherData);
+            setUserLocation(usingFallback ? 'Hyderabad, IN' : 'Unknown Location');
+          }
+        } catch (error) {
+          console.error('Failed to fetch location data:', error);
+          setUserLocation(usingFallback ? 'Hyderabad, IN' : 'Unknown Location');
+        } finally {
+          setLocationFetching(false);
+        }
+      }
+    };
+
+    // Execute immediately
+    fetchLocationData();
+    
+    // Also refresh data when location changes
+    const refreshInterval = setInterval(() => {
+      if (!locationFetching) {
+        console.log('Refreshing weather data automatically');
+        fetchLocationData();
+      }
+    }, 30 * 60 * 1000); // Refresh every 30 minutes
+    
+    return () => clearInterval(refreshInterval);
+  }, [location, usingFallback]);
 
   // Save layout preference to localStorage
   useEffect(() => {
@@ -130,6 +196,7 @@ const Dashboard = () => {
     condition: 'Sunny',
     humidity: 65,
     wind: 12,
+    feelsLike: 34,
     forecast: [
       { day: 'Today', temp: 32, icon: <Sun className="h-4 w-4" />, condition: 'Sunny' },
       { day: 'Tue', temp: 30, icon: <Cloud className="h-4 w-4" />, condition: 'Partly Cloudy' },
@@ -241,10 +308,86 @@ const Dashboard = () => {
     }
   };
   
-  // Default layout rendering
+  // Render dashboard content based on selected layout
   const renderDefaultLayout = () => {
     return (
       <>
+        {/* Welcome Banner */}
+        <div className="mb-6 p-6 rounded-xl bg-gradient-to-r from-agri-blue to-agri-green/60 text-white">
+          <div className="flex flex-col md:flex-row justify-between">
+            <div className="mb-4 md:mb-0">
+              <p className="text-white/80">{getTimeOfDay()}</p>
+              <h2 className="text-3xl font-bold flex items-center gap-2">
+                Welcome back, {currentUser?.displayName || 'User'}! <Sun className="h-6 w-6 text-yellow-300" />
+              </h2>
+              <p className="mt-2 text-white/90">
+                Your farm is looking good today. Check out your personalized insights 
+                and recommendations for maximum productivity.
+              </p>
+              
+              <div className="flex mt-4 space-x-4">
+                <div className="flex items-center bg-white/10 px-3 py-1.5 rounded-md">
+                  <Leaf className="h-4 w-4 mr-2 text-green-200" />
+                  <span className="text-sm">Season: Spring</span>
+                </div>
+                <div className="flex items-center bg-white/10 px-3 py-1.5 rounded-md">
+                  <MapPin className="h-4 w-4 mr-2 text-green-200" />
+                  <span className="text-sm">
+                    {locationFetching ? (
+                      <span className="flex items-center">
+                        Loading location... <Loader className="h-3 w-3 ml-1 animate-spin" />
+                      </span>
+                    ) : userLocation ? (
+                      <span>
+                        {userLocation}
+                        {usingFallback && <span className="ml-1 text-xs text-yellow-200">(Default)</span>}
+                      </span>
+                    ) : (
+                      'Unknown Location'
+                    )}
+                  </span>
+                </div>
+              </div>
+            </div>
+            
+            <div className="bg-white/10 rounded-xl p-4 flex flex-col items-end">
+              <div className="flex items-center">
+                <Sun className="h-6 w-6 text-yellow-300 mr-2" />
+                <span className="text-3xl font-bold">{weatherData.temperature}°C</span>
+              </div>
+              <p className="text-lg text-white/80 mb-2">{weatherData.condition}</p>
+              
+              <div className="grid grid-cols-3 gap-4 mt-2">
+                <div className="text-center">
+                  <p className="text-xs text-white/60">Humidity</p>
+                  <div className="flex flex-col items-center">
+                    <Droplets className="h-4 w-4 text-white/80" />
+                    <p className="font-medium">{weatherData.humidity}%</p>
+                  </div>
+                </div>
+                <div className="text-center">
+                  <p className="text-xs text-white/60">Wind</p>
+                  <div className="flex flex-col items-center">
+                    <Wind className="h-4 w-4 text-white/80" />
+                    <p className="font-medium">{weatherData.wind} km/h</p>
+                  </div>
+                </div>
+                <div className="text-center">
+                  <p className="text-xs text-white/60">Feels like</p>
+                  <div className="flex flex-col items-center">
+                    <Thermometer className="h-4 w-4 text-white/80" />
+                    <p className="font-medium">{weatherData.feelsLike || (weatherData.temperature + 2)}°C</p>
+                  </div>
+                </div>
+              </div>
+              
+              <p className="text-xs text-white/60 mt-2">
+                Today's forecast for {userLocation || 'your location'}
+              </p>
+            </div>
+          </div>
+        </div>
+        
         {/* Quick Actions */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
           <Card className="bg-agri-soil/10 hover:bg-agri-soil/20 cursor-pointer transition-colors" onClick={() => handleQuickAction('soil-analysis')}>
@@ -371,13 +514,35 @@ const Dashboard = () => {
     }
   };
 
+  // Helper function to get time of day greeting
+  const getTimeOfDay = () => {
+    const hour = new Date().getHours();
+    if (hour < 12) return 'Good morning';
+    if (hour < 18) return 'Good afternoon';
+    return 'Good evening';
+  };
+
   return (
     <MainLayout>
       <div className="p-4 md:p-6">
         <div className="flex flex-col md:flex-row md:items-center justify-between mb-6">
           <div>
-            <h1 className="text-2xl font-bold">{t('dashboard.title')}</h1>
-            <p className="text-gray-500">{t('dashboard.welcome', { name: currentUser?.displayName || 'User' })}</p>
+            <div className="flex items-center text-gray-500">
+              <p>
+                {t('dashboard.welcome', { name: currentUser?.displayName || 'User' })}
+              </p>
+              {locationFetching ? (
+                <div className="flex items-center ml-1">
+                  <Loader className="h-3 w-3 animate-spin ml-1" />
+                </div>
+              ) : userLocation ? (
+                <div className="flex items-center text-agri-darkGreen ml-1">
+                  <MapPin className="h-3 w-3 ml-1 mr-0.5" />
+                  <span className="font-medium">{userLocation}</span>
+                  {usingFallback && <span className="text-xs ml-1 text-amber-600">(Default)</span>}
+                </div>
+              ) : null}
+            </div>
           </div>
           <div className="flex items-center space-x-2 mt-4 md:mt-0">
             <Button 

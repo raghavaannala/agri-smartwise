@@ -15,7 +15,17 @@
     "profile": "Profile",
     "settings": "Settings",
     "selectLanguage": "Select Language",
-    "collapse": "Collapse"
+    "collapse": "Collapse",
+    "active": "Active",
+    "good": "Good",
+    "last": "Last",
+    "today": "Today",
+    "daysAgo": "{{count}} days ago",
+    "weekAgo": "{{count}} week ago",
+    "refresh": "Refresh",
+    "yesterday": "Yesterday",
+    "tomorrow": "Tomorrow",
+    "medium": "Medium"
   },
   "founders": {
     "title": "Meet Our Founders",
