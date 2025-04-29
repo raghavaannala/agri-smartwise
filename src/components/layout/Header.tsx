@@ -15,6 +15,8 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { getAllFounders } from '@/services/foundersService';
 
 const Header = () => {
   const { currentLanguage, changeLanguage, languages } = useLanguage();
@@ -88,12 +90,41 @@ const Header = () => {
   };
   
   return (
-    <header className="bg-white border-b border-gray-200 h-16 flex items-center px-4 md:px-6">
-      <div className="flex-1"></div>
-      <div className="flex items-center space-x-4">
+    <header className="bg-gradient-to-r from-green-50 to-amber-50 border-b border-green-200 h-16 flex items-center px-4 md:px-6 relative overflow-hidden">
+      {/* Nature-themed decorative elements */}
+      <div className="absolute inset-0 z-0 overflow-hidden">
+        {/* Subtle leaf patterns */}
+        <svg className="absolute top-0 right-0 text-green-200 opacity-20 h-24 w-24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M21 5C19.89 4.65 18.67 4.43 17.5 4.35C15.55 4.21 13.76 4.76 12 6C10.24 4.76 8.45 4.21 6.5 4.35C5.33 4.43 4.11 4.65 3 5C3 5.9 3 9.65 3 11.5C3 15.07 6.18 17.42 9 18.31V20C9 20.55 9.45 21 10 21H14C14.55 21 15 20.55 15 20V18.31C17.82 17.42 21 15.07 21 11.5C21 9.65 21 5.9 21 5Z" fill="currentColor"/>
+        </svg>
+        <svg className="absolute bottom-0 left-20 text-amber-300 opacity-20 h-20 w-20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z" fill="currentColor"/>
+        </svg>
+        <svg className="absolute top-5 left-1/3 text-green-300 opacity-10 h-16 w-16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M7 17.5C7 18.61 6.11 19.5 5 19.5C3.89 19.5 3 18.61 3 17.5C3 16.39 3.89 15.5 5 15.5C6.11 15.5 7 16.39 7 17.5Z" fill="currentColor"/>
+          <path d="M11.5 16.5L13.5 14.5L15.5 16.5L17.5 14.5L18 19.5H7L7.5 14.5L9.5 16.5L11.5 16.5Z" fill="currentColor"/>
+          <path d="M12.5 2.5L13.87 7.5H18.91L14.97 10.42L16.34 15.5L12.5 12.58L8.66 15.5L10.03 10.42L6.09 7.5H11.13L12.5 2.5Z" fill="currentColor"/>
+        </svg>
+      </div>
+
+      <div className="flex-1 z-10">
+        {/* App logo or name could go here */}
+        <Link to="/" className="flex items-center">
+          <div className="flex items-center">
+            <svg className="h-8 w-8 text-green-600" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M12 22C17.5228 22 22 17.5228 22 12C22 6.47715 17.5228 2 12 2C6.47715 2 2 6.47715 2 12C2 17.5228 6.47715 22 12 22Z" fill="currentColor" fillOpacity="0.2"/>
+              <path d="M7 13L12 18L17 13" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              <path d="M7 7L12 12L17 7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+            <span className="ml-2 font-bold text-green-800 text-lg hidden md:block">SmartAgroX</span>
+          </div>
+        </Link>
+      </div>
+
+      <div className="flex items-center space-x-4 z-10">
         {/* Language Selector */}
         <DropdownMenu>
-          <DropdownMenuTrigger className="flex items-center text-gray-600 hover:text-agri-green transition-colors">
+          <DropdownMenuTrigger className="flex items-center text-green-700 hover:text-green-800 transition-colors">
             <Globe className="h-5 w-5 mr-1" />
             <span className="hidden md:inline-block text-sm">{currentLanguage.name}</span>
             <ChevronDown className="h-4 w-4 ml-1" />
@@ -126,9 +157,9 @@ const Header = () => {
         {/* Notifications - Only show when logged in */}
         {currentUser && (
           <DropdownMenu>
-            <DropdownMenuTrigger className="relative text-gray-600 hover:text-agri-green transition-colors">
+            <DropdownMenuTrigger className="relative text-green-700 hover:text-green-800 transition-colors">
               <Bell className="h-5 w-5" />
-              <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-4 w-4 flex items-center justify-center">
+              <span className="absolute -top-1 -right-1 bg-amber-500 text-white text-xs rounded-full h-4 w-4 flex items-center justify-center">
                 3
               </span>
             </DropdownMenuTrigger>
@@ -160,10 +191,10 @@ const Header = () => {
         {/* User Profile or Sign In Button */}
         {currentUser ? (
           <DropdownMenu>
-            <DropdownMenuTrigger className="flex items-center text-gray-600 hover:text-agri-green transition-colors">
-              <Avatar className="h-8 w-8">
+            <DropdownMenuTrigger className="flex items-center text-green-700 hover:text-green-800 transition-colors">
+              <Avatar className="h-8 w-8 ring-2 ring-green-200">
                 <AvatarImage src={userImage} alt={userName} />
-                <AvatarFallback className="bg-agri-green/10">
+                <AvatarFallback className="bg-green-100 text-green-800">
                   {getInitials(userName)}
                 </AvatarFallback>
               </Avatar>
@@ -189,7 +220,7 @@ const Header = () => {
         ) : (
           <Button 
             variant="outline" 
-            className="flex items-center text-agri-green border-agri-green hover:bg-agri-green/10"
+            className="flex items-center text-green-700 border-green-300 hover:bg-green-100"
             onClick={() => navigate('/login')}
           >
             <LogIn className="h-4 w-4 mr-2" />

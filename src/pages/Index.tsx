@@ -39,7 +39,10 @@ import {
   CalendarClock,
   Newspaper,
   Flame,
-  RefreshCw
+  RefreshCw,
+  Activity,
+  PanelTop,
+  TrendingUp
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -66,6 +69,48 @@ import { cn } from '@/lib/utils';
 import { useLocation } from '../hooks/useLocation';
 import { getCurrentWeather } from '../services/weatherService';
 import { useToast } from '@/components/ui/use-toast';
+import { Input } from '@/components/ui/input';
+
+// Animation variants
+const containerVariants = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.1
+    }
+  }
+};
+
+const itemVariants = {
+  hidden: { opacity: 0, y: 20 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    transition: { 
+      type: "spring",
+      stiffness: 100,
+      damping: 12
+    }
+  }
+};
+
+const fadeInUp = {
+  hidden: { opacity: 0, y: 10 },
+  visible: { 
+    opacity: 1, 
+    y: 0,
+    transition: { duration: 0.4 }
+  }
+};
+
+// Update the globalAgriNews interface/type to include summary property
+interface AgriNewsItem {
+  title: string;
+  category: string;
+  date: string;
+  summary: string;
+}
 
 const Index = () => {
   const { currentUser } = useAuth();
@@ -90,10 +135,25 @@ const Index = () => {
   });
   
   // Global news/trends (placeholder for real API data)
-  const [globalAgriNews, setGlobalAgriNews] = useState([
-    { title: 'Global wheat prices stabilize after 3-month volatility', category: 'Market', date: 'Today' },
-    { title: 'New drought-resistant crop varieties show promise in field tests', category: 'Innovation', date: 'Yesterday' },
-    { title: 'Climate patterns shifting farming seasons across continents', category: 'Climate', date: '2 days ago' }
+  const [globalAgriNews, setGlobalAgriNews] = useState<AgriNewsItem[]>([
+    {
+      title: "Global Wheat Production Expected to Rise by 5%",
+      category: "Market",
+      date: "2 days ago",
+      summary: "Analysts predict increased wheat yields globally due to favorable weather conditions."
+    },
+    {
+      title: "New Sustainable Farming Techniques Show Promise",
+      category: "Innovation",
+      date: "5 days ago",
+      summary: "Researchers demonstrate improved crop yields with reduced environmental impact using new methods."
+    },
+    {
+      title: "Climate Change Impact on Agricultural Zones",
+      category: "Research",
+      date: "1 week ago",
+      summary: "Study maps shifting agricultural zones due to climate change, with implications for future crop selection."
+    }
   ]);
   
   // Location and weather data
@@ -273,16 +333,16 @@ const Index = () => {
             sessionStorage.setItem('uploadedImage', imageData);
             sessionStorage.setItem('analysisType', 'disease'); // Default to disease analysis
             
-            // Small delay to ensure storage is complete before navigation
-            setTimeout(() => {
-              // Navigate to the disease scan page with an absolute path to avoid relative path issues on mobile
-              const targetPath = window.location.origin + '/disease-scan';
-              window.location.href = targetPath;
-            }, 100);
+            // Get the base URL regardless of current path to prevent broken navigation
+            const baseUrl = window.location.origin;
+            const targetPath = `${baseUrl}/disease-scan`;
+            
+            // Use window.location.href for reliable navigation on mobile
+            window.location.href = targetPath;
           } catch (storageError) {
             console.error('SessionStorage error:', storageError);
             // Fallback - navigate directly without storage
-            navigate('/disease-scan');
+            window.location.href = window.location.origin + '/disease-scan';
           }
         } catch (error) {
           console.error('Error processing image:', error);
@@ -296,7 +356,7 @@ const Index = () => {
       
       reader.onerror = () => {
         console.error('FileReader error');
-        navigate('/disease-scan');
+        window.location.href = window.location.origin + '/disease-scan';
       };
       
       reader.readAsDataURL(file);
@@ -572,7 +632,7 @@ const Index = () => {
                 {t('diseaseScan.uploadImages')}
               </Button>
 
-              <label htmlFor="disease-camera-capture">
+              <label htmlFor="disease-camera-capture" className="relative inline-block">
                 <Button className="bg-agri-blue hover:bg-agri-blue/90">
                   <Camera className="mr-2 h-4 w-4" />
                   {t('diseaseScan.takePhoto')}
@@ -582,7 +642,7 @@ const Index = () => {
                   type="file"
                   accept="image/*"
                   capture="environment"
-                  className="hidden"
+                  className="absolute inset-0 opacity-0 w-full h-full cursor-pointer"
                   onChange={handleFileChange}
                 />
               </label>
@@ -834,35 +894,441 @@ const Index = () => {
     );
   };
   
+  // Enhance the seasons data with icons
+  const seasonalData = {
+    currentSeason: "Kharif",
+    idealCrops: ["Rice", "Cotton", "Sugarcane", "Maize"],
+    weatherConditions: [
+      { label: "Rainfall", value: "65%", icon: <Droplets className="h-4 w-4 text-blue-500" /> },
+      { label: "Sunlight", value: "High", icon: <Sun className="h-4 w-4 text-yellow-500" /> },
+      { label: "Wind", value: "Moderate", icon: <Wind className="h-4 w-4 text-gray-500" /> },
+    ]
+  };
+
+  // Add an agriculture calendar
+  const upcomingEvents = [
+    { date: "June 15", event: "Sowing Season Begins", location: "Central Region" },
+    { date: "July 10", event: "Fertilizer Application", location: "All Regions" },
+    { date: "August 5", event: "Pest Management Workshop", location: "Western Districts" }
+  ];
+  
   return (
     <MainLayout>
-      {isLoading ? (
-        renderLoadingSkeleton()
-      ) : (
-        <div className="animate-fadeIn">
+      <div className="px-4 md:px-6 relative">
+        <input
+          ref={fileInputRef}
+          type="file"
+          className="hidden"
+          accept="image/*"
+          onChange={handleFileChange}
+        />
+        
+        {/* Welcome Banner */}
+        <motion.div 
+          initial="hidden"
+          animate="visible"
+          variants={fadeInUp}
+          className="mb-6"
+        >
           <WelcomeBanner 
             userName={userName}
             temperature={weatherData.temperature}
             weatherCondition={weatherData.condition}
             location={userLocation}
           />
-          
-          {renderFarmStatus()}
-          
-          {renderDashboardControls()}
-          
-          {renderDashboardCards()}
-          
-          {/* Hidden file input for disease detection uploads */}
-          <input
+        </motion.div>
+
+        {/* Farm Monitoring Component */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, delay: 0.2 }}
+          className="mb-6 bg-gradient-to-r from-agri-darkGreen/90 to-agri-green/90 rounded-xl shadow-lg overflow-hidden"
+        >
+          <div className="p-6 text-white">
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6">
+              <div>
+                <h2 className="text-2xl font-bold mb-2">Farm Management & Analysis</h2>
+                <p className="text-white/80 max-w-2xl">Monitor your farm health, detect diseases, analyze soil conditions, and get real-time insights with our AI-powered tools.</p>
+              </div>
+              <Button 
+                onClick={() => navigate('/dashboard')} 
+                className="mt-4 md:mt-0 bg-white text-agri-darkGreen hover:bg-white/90 transition-all duration-300"
+              >
+                <PanelTop className="h-4 w-4 mr-2" />
+                View Dashboard
+              </Button>
+            </div>
+            
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              <motion.div 
+                whileHover={{ scale: 1.05, boxShadow: "0 10px 25px -5px rgba(0, 0, 0, 0.1)" }}
+                whileTap={{ scale: 0.98 }}
+                className="bg-white/20 backdrop-blur-sm rounded-lg p-4 cursor-pointer hover:bg-white/30 transition-all duration-300 border-2 border-white/40 relative overflow-hidden"
+                onClick={() => navigate('/farm')}
+              >
+                {/* Pulsing highlight effect */}
+                <div className="absolute -top-10 -right-10 w-20 h-20 bg-white/30 rounded-full animate-pulse" />
+                
+                <div className="flex items-center mb-3">
+                  <div className="p-2 bg-white/30 rounded-full mr-3 shadow-inner">
+                    <Tractor className="h-6 w-6 text-white animate-bounce" />
+                  </div>
+                  <h3 className="font-bold text-lg">Farm Management</h3>
+                </div>
+                <p className="text-sm text-white/90 mb-4 font-medium">View and manage your farms with detailed analytics and recommendations</p>
+                <div className="flex items-center bg-white/30 rounded-full px-3 py-2 w-fit text-white font-semibold text-sm mt-2 hover:bg-white/40 transition-all shadow-sm">
+                  <span>View My Farms</span>
+                  <ArrowRight className="h-4 w-4 ml-2 animate-pulse" />
+                </div>
+                <div className="absolute bottom-2 right-2 text-xs text-white/50 font-medium">
+                  New features
+                </div>
+              </motion.div>
+
+              <motion.div 
+                whileHover={{ scale: 1.03 }}
+                whileTap={{ scale: 0.98 }}
+                className="bg-white/10 backdrop-blur-sm rounded-lg p-4 cursor-pointer hover:bg-white/20 transition-all duration-300"
+                onClick={() => navigate('/disease-scan')}
+              >
+                <div className="flex items-center mb-3">
+                  <div className="p-2 bg-white/20 rounded-full mr-3">
+                    <Scan className="h-5 w-5 text-white" />
+                  </div>
+                  <h3 className="font-semibold">Disease Detection</h3>
+                </div>
+                <p className="text-sm text-white/70 mb-3">Scan and identify crop diseases with AI-powered analysis</p>
+                <div className="flex items-center text-white/90 text-sm">
+                  <span>Analyze Now</span>
+                  <ArrowRight className="h-3 w-3 ml-1" />
+                </div>
+              </motion.div>
+              
+              <motion.div 
+                whileHover={{ scale: 1.03 }}
+                whileTap={{ scale: 0.98 }}
+                className="bg-white/10 backdrop-blur-sm rounded-lg p-4 cursor-pointer hover:bg-white/20 transition-all duration-300"
+                onClick={() => {
+                  // Store the analysis type in sessionStorage
+                  try {
+                    sessionStorage.setItem('analysisType', 'pesticide');
+                    navigate('/disease-scan');
+                  } catch (error) {
+                    console.error('Error setting analysis type:', error);
+                    navigate('/disease-scan');
+                  }
+                }}
+              >
+                <div className="flex items-center mb-3">
+                  <div className="p-2 bg-white/20 rounded-full mr-3">
+                    <AlertCircle className="h-5 w-5 text-white" />
+                  </div>
+                  <h3 className="font-semibold">Pest Analysis</h3>
+                </div>
+                <p className="text-sm text-white/70 mb-3">Identify and manage pest infestations with targeted solutions</p>
+                <div className="flex items-center text-white/90 text-sm">
+                  <span>Detect Pests</span>
+                  <ArrowRight className="h-3 w-3 ml-1" />
+                </div>
+              </motion.div>
+              
+              <motion.div 
+                whileHover={{ scale: 1.03 }}
+                whileTap={{ scale: 0.98 }}
+                className="bg-white/10 backdrop-blur-sm rounded-lg p-4 cursor-pointer hover:bg-white/20 transition-all duration-300"
+                onClick={() => navigate('/soil-lab')}
+              >
+                <div className="flex items-center mb-3">
+                  <div className="p-2 bg-white/20 rounded-full mr-3">
+                    <Droplets className="h-5 w-5 text-white" />
+                  </div>
+                  <h3 className="font-semibold">Soil Analysis</h3>
+                </div>
+                <p className="text-sm text-white/70 mb-3">Check soil health, nutrients, and get personalized recommendations</p>
+                <div className="flex items-center text-white/90 text-sm">
+                  <span>Test Soil</span>
+                  <ArrowRight className="h-3 w-3 ml-1" />
+                </div>
+              </motion.div>
+            </div>
+            
+            <div className="mt-6 flex justify-center">
+              <Button 
+                onClick={() => navigate('/farm')}
+                className="flex items-center justify-center gap-2 bg-white hover:bg-white/90 text-agri-darkGreen px-8 py-6 rounded-full cursor-pointer transition-all duration-300 font-bold shadow-lg text-lg hover:shadow-xl hover:scale-105 transform"
+              >
+                <Tractor className="h-5 w-5" />
+                <span>View and Manage Your Farms</span>
+                <span className="ml-2 bg-agri-green text-white text-xs px-2 py-1 rounded-full animate-pulse">NEW</span>
+              </Button>
+            </div>
+          </div>
+        </motion.div>
+
+        {isLoading ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-8">
+            {Array(3).fill(0).map((_, i) => (
+              <Skeleton key={i} className="h-[180px] rounded-xl" />
+            ))}
+          </div>
+        ) : (
+          <div className="flex flex-col space-y-6 p-6">
+            {/* Main Content Section */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              {/* Seasonal Information Banner */}
+              <motion.div
+                variants={containerVariants}
+                initial="hidden"
+                animate="visible"
+                className="col-span-full bg-gradient-to-r from-amber-50 to-yellow-50 rounded-lg border border-amber-100 p-4"
+              >
+                <div className="flex items-center gap-2 mb-3">
+                  <Leaf className="h-5 w-5 text-green-600" />
+                  <h2 className="text-lg font-medium text-amber-900">Current Growing Season: {seasonalData.currentSeason}</h2>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
+                    <h3 className="text-sm font-medium text-amber-800 mb-2">Ideal Crops</h3>
+                    <div className="flex flex-wrap gap-2">
+                      {seasonalData.idealCrops.map((crop, idx) => (
+                        <Badge key={idx} variant="outline" className="bg-amber-50 text-amber-800 border-amber-200">
+                          {crop}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-medium text-amber-800 mb-2">Weather Conditions</h3>
+                    <div className="space-y-1">
+                      {seasonalData.weatherConditions.map((condition, idx) => (
+                        <div key={idx} className="flex items-center gap-2 text-sm">
+                          {condition.icon}
+                          <span className="text-amber-900">{condition.label}:</span>
+                          <span className="font-medium text-amber-700">{condition.value}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-medium text-amber-800 mb-2">Upcoming Events</h3>
+                    <div className="space-y-1">
+                      {upcomingEvents.map((event, idx) => (
+                        <div key={idx} className="text-sm flex gap-2">
+                          <MapPin className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
+                          <div>
+                            <span className="font-medium text-amber-900">{event.date}</span>
+                            <p className="text-amber-800">{event.event} • {event.location}</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </motion.div>
+
+              {/* Dashboard Controls Section */}
+              <motion.div 
+                variants={itemVariants}
+                className="col-span-1 lg:col-span-2 space-y-6"
+              >
+                {/* Agriculture Summary Cards */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {/* Soil Health Card */}
+                  <motion.div 
+                    variants={itemVariants}
+                    className="bg-white rounded-lg border border-gray-100 shadow-sm p-4"
+                  >
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <h3 className="text-sm font-medium text-gray-500">{t('dashboard.soil')}</h3>
+                        <p className="text-xl font-semibold mt-1">72% Healthy</p>
+                      </div>
+                      <div className="p-2 bg-green-50 rounded-md">
+                        <Activity className="h-5 w-5 text-green-500" />
+                      </div>
+                    </div>
+                    <div className="mt-4">
+                      <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+                        <div className="h-full bg-green-500 rounded-full" style={{ width: "72%" }}></div>
+                      </div>
+                    </div>
+                    <div className="mt-3 text-sm text-gray-500 flex justify-between">
+                      <span>pH: 6.8</span>
+                      <span>Moisture: 42%</span>
+                      <span>Nitrogen: High</span>
+                    </div>
+                  </motion.div>
+
+                  {/* Crops Status Card */}
+                  <motion.div 
+                    variants={itemVariants}
+                    className="bg-white rounded-lg border border-gray-100 shadow-sm p-4"
+                  >
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <h3 className="text-sm font-medium text-gray-500">{t('dashboard.crops')}</h3>
+                        <p className="text-xl font-semibold mt-1">3 Active Crops</p>
+                      </div>
+                      <div className="p-2 bg-blue-50 rounded-md">
+                        <PanelTop className="h-5 w-5 text-blue-500" />
+                      </div>
+                    </div>
+                    <div className="mt-4">
+                      <div className="space-y-2">
+                        <div className="flex justify-between text-sm">
+                          <span>Cotton</span>
+                          <span className="text-green-600">Excellent</span>
+                        </div>
+                        <div className="flex justify-between text-sm">
+                          <span>Maize</span>
+                          <span className="text-yellow-600">Good</span>
+                        </div>
+                        <div className="flex justify-between text-sm">
+                          <span>Sugarcane</span>
+                          <span className="text-blue-600">Needs Water</span>
+                        </div>
+                      </div>
+                    </div>
+                  </motion.div>
+
+                  {/* Market Insights Card */}
+                  <motion.div 
+                    variants={itemVariants}
+                    className="bg-white rounded-lg border border-gray-100 shadow-sm p-4"
+                  >
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <h3 className="text-sm font-medium text-gray-500">{t('dashboard.market')}</h3>
+                        <p className="text-xl font-semibold mt-1">+4.2% Average</p>
+                      </div>
+                      <div className="p-2 bg-purple-50 rounded-md">
+                        <TrendingUp className="h-5 w-5 text-purple-500" />
+                      </div>
+                    </div>
+                    <div className="mt-4 space-y-2">
+                      <div className="flex justify-between text-sm">
+                        <span>Cotton</span>
+                        <span className="text-green-600">+5.2%</span>
+                      </div>
+                      <div className="flex justify-between text-sm">
+                        <span>Maize</span>
+                        <span className="text-green-600">+3.8%</span>
+                      </div>
+                      <div className="flex justify-between text-sm">
+                        <span>Sugarcane</span>
+                        <span className="text-red-600">-0.5%</span>
+                      </div>
+                    </div>
+                  </motion.div>
+                </div>
+
+                {/* Global Trends Section */}
+                <motion.div 
+                  variants={itemVariants}
+                  className="bg-white rounded-lg border border-gray-100 shadow-sm p-4"
+                >
+                  <div className="flex justify-between items-center mb-4">
+                    <h2 className="text-lg font-medium">{t('dashboard.globalTrends')}</h2>
+                    <Button variant="ghost" size="sm" className="text-sm">
+                      {t('dashboard.viewAllNews')}
+                    </Button>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {globalAgriNews.map((news, idx) => (
+                      <div key={idx} className="border border-gray-100 rounded-md p-3 hover:bg-gray-50 transition-colors">
+                        <Badge variant="outline" className="mb-2">{news.category}</Badge>
+                        <h3 className="font-medium mb-1">{news.title}</h3>
+                        <p className="text-sm text-gray-500 mb-2">{news.summary}</p>
+                        <p className="text-xs text-gray-400">{news.date}</p>
+                      </div>
+                    ))}
+                  </div>
+                </motion.div>
+              </motion.div>
+
+              {/* Right Sidebar/Quick Tools */}
+              <motion.div 
+                variants={containerVariants}
+                initial="hidden"
+                animate="visible"
+                className="col-span-1 space-y-4"
+              >
+                {/* Weather Widget */}
+                <div className="bg-gradient-to-br from-sky-50 to-blue-50 rounded-lg border border-sky-100 shadow-sm p-4">
+                  <h2 className="text-base font-medium text-sky-900 mb-3">Today's Weather</h2>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center">
+                      <Sun className="h-10 w-10 text-yellow-500 mr-3" />
+                      <div>
+                        <p className="text-2xl font-bold text-sky-900">32°C</p>
+                        <p className="text-sm text-sky-700">Sunny, Clear Sky</p>
+                      </div>
+                    </div>
+                    <div className="text-right text-sm text-sky-700">
+                      <p>Humidity: 45%</p>
+                      <p>Wind: 8 km/h</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Quick Actions */}
+                <div className="bg-white rounded-lg border border-gray-100 shadow-sm p-4">
+                  <h2 className="text-base font-medium mb-3">Quick Actions</h2>
+                  <div className="grid grid-cols-2 gap-2">
+                    <Button 
+                      variant="default" 
+                      size="sm" 
+                      className="justify-start bg-gradient-to-r from-agri-green to-agri-darkGreen hover:from-agri-darkGreen hover:to-agri-green text-white shadow-md relative overflow-hidden group"
+                      onClick={() => navigate('/farm')}
+                    >
+                      <span className="absolute inset-0 w-full h-full bg-white/10 transform -skew-x-12 -translate-x-full group-hover:translate-x-0 transition-transform duration-300"></span>
+                      <Tractor className="h-4 w-4 mr-2 relative z-10" />
+                      <span className="relative z-10">My Farms</span>
+                      <div className="absolute top-0 right-0 bg-white/20 text-xs font-bold rounded-bl-md px-1">★</div>
+                    </Button>
+                    <Button variant="outline" size="sm" className="justify-start">
+                      <Leaf className="h-4 w-4 mr-2" />
+                      Crop Planner
+                    </Button>
+                    <Button variant="outline" size="sm" className="justify-start">
+                      <Droplets className="h-4 w-4 mr-2" />
+                      Irrigation
+                    </Button>
+                    <Button variant="outline" size="sm" className="justify-start">
+                      <Activity className="h-4 w-4 mr-2" />
+                      Pest Alert
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Farm Image Upload Section */}
+                <div className="bg-white rounded-lg border border-gray-100 shadow-sm p-4">
+                  <h2 className="text-base font-medium mb-3">Farm Monitoring</h2>
+                  <p className="text-sm text-gray-500 mb-3">Upload a photo of your crop for AI analysis</p>
+                  <div className="border-2 border-dashed border-gray-200 rounded-lg p-4 text-center">
+                    <Input 
             type="file"
-            ref={fileInputRef}
-            onChange={handleFileChange}
-            accept="image/*"
+                      id="farm-image" 
             className="hidden"
-          />
+                      accept="image/*" 
+                    />
+                    <label 
+                      htmlFor="farm-image" 
+                      className="cursor-pointer flex flex-col items-center justify-center"
+                    >
+                      <Upload className="h-8 w-8 text-gray-400 mb-2" />
+                      <span className="text-sm text-gray-500">Click to upload</span>
+                      <span className="text-xs text-gray-400 mt-1">JPG, PNG up to 5MB</span>
+                    </label>
+                  </div>
+                  <Button className="w-full mt-3">Analyze Crop Health</Button>
+                </div>
+              </motion.div>
+            </div>
         </div>
       )}
+      </div>
     </MainLayout>
   );
 };

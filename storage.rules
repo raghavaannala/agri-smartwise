@@ -1,0 +1,24 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    // Allow authenticated users to read any image
+    match /{allPaths=**} {
+      allow read: if request.auth != null;
+    }
+    
+    // Allow authenticated users to upload images to their own folder
+    match /farms/{userId}/{allImages=**} {
+      allow write: if request.auth != null && request.auth.uid == userId;
+    }
+    
+    // Allow authenticated users to upload disease scan images
+    match /disease-scans/{userId}/{allImages=**} {
+      allow write: if request.auth != null && request.auth.uid == userId;
+    }
+    
+    // Allow authenticated users to upload soil images
+    match /soil-lab/{userId}/{allImages=**} {
+      allow write: if request.auth != null && request.auth.uid == userId;
+    }
+  }
+}

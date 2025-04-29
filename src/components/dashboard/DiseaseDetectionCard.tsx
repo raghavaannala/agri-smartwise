@@ -289,7 +289,7 @@ const DiseaseDetectionCard = ({ initialImage = null, initialAnalysisType = 'dise
             </div>
           </label>
 
-          <label htmlFor="camera-capture">
+          <label htmlFor="camera-capture" className="relative inline-block">
             <div className="relative inline-block">
               <Button className="bg-agri-blue hover:bg-agri-blue/90" disabled={isAnalyzing}>
                 <Camera className="mr-2 h-4 w-4" />
@@ -300,7 +300,7 @@ const DiseaseDetectionCard = ({ initialImage = null, initialAnalysisType = 'dise
                 type="file"
                 accept="image/*"
                 capture="environment"
-                className="absolute inset-0 opacity-0 cursor-pointer"
+                className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
                 onChange={handleImageUpload}
                 disabled={isAnalyzing}
               />

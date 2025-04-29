@@ -1,20 +1,24 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" fill="none">
-  <!-- Background Circle -->
-  <circle cx="32" cy="32" r="30" fill="#4CAF50" />
-  <circle cx="32" cy="32" r="28" fill="#43A047" />
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 800">
+  <!-- Green Leaf -->
+  <path d="M500,100 C650,150 650,350 500,500 C350,350 350,150 500,100 Z" fill="url(#leaf-gradient)" />
+  <path d="M500,100 C450,250 450,350 500,500 C550,350 550,250 500,100 Z" fill="white" fill-opacity="0.3" />
   
-  <!-- Plant/Leaf Elements -->
-  <path d="M32 12C24 12 18 18 18 26C18 34 24 38 32 38C40 38 46 34 46 26C46 18 40 12 32 12Z" fill="#81C784" />
-  <path d="M32 14C25 14 20 19 20 26C20 33 25 36 32 36C39 36 44 33 44 26C44 19 39 14 32 14Z" fill="#A5D6A7" />
+  <!-- Circuit Lines -->
+  <path d="M500,400 L600,400 L600,300 L700,300" stroke="#40c4e0" stroke-width="20" fill="none" />
+  <path d="M500,350 L550,350 L550,200 L700,200" stroke="#40c4e0" stroke-width="20" fill="none" />
+  <path d="M500,450 L650,450 L650,400 L700,400" stroke="#40c4e0" stroke-width="20" fill="none" />
   
-  <!-- Stem -->
-  <rect x="30" y="36" width="4" height="16" fill="#795548" />
+  <!-- Circuit Endpoints -->
+  <circle cx="700" cy="200" r="30" fill="#40c4e0" />
+  <circle cx="700" cy="300" r="30" fill="#40c4e0" />
+  <circle cx="700" cy="400" r="30" fill="#40c4e0" />
   
-  <!-- Sun Rays -->
-  <circle cx="32" cy="26" r="6" fill="#FFC107" />
-  <circle cx="32" cy="26" r="4" fill="#FFEB3B" />
-  
-  <!-- Water Droplet -->
-  <path d="M26 44C26 48 29 52 32 52C35 52 38 48 38 44C38 40 35 38 32 38C29 38 26 40 26 44Z" fill="#2196F3" />
-  <path d="M28 44C28 47 30 50 32 50C34 50 36 47 36 44C36 41 34 40 32 40C30 40 28 41 28 44Z" fill="#64B5F6" />
-</svg> 
+  <!-- Gradients -->
+  <defs>
+    <linearGradient id="leaf-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#90ee90" />
+      <stop offset="100%" stop-color="#008000" />
+    </linearGradient>
+  </defs>
+</svg>

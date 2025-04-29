@@ -10,6 +10,7 @@ import { motion } from 'framer-motion';
 import { analyzeSoil } from '@/services/geminiService';
 import { useTranslation } from 'react-i18next';
 import { Badge } from '@/components/ui/badge';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 interface SoilNutrients {
   nitrogen: number;
@@ -32,6 +33,7 @@ type SoilAnalysisResult = {
   recommendations: string;
   suitableCrops: string[];
   imageSrc: string | null;
+  soilPresent: boolean;
   nutrients: SoilNutrients;
   properties: SoilProperties;
 };
@@ -41,6 +43,7 @@ const SoilLab = () => {
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysisResult, setAnalysisResult] = useState<SoilAnalysisResult | null>(null);
+  const [noSoilDetected, setNoSoilDetected] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
@@ -48,7 +51,9 @@ const SoilLab = () => {
     const file = event.target.files?.[0];
     if (!file) return;
 
-    // Check file size (limit to 5MB)
+    setNoSoilDetected(false);
+    setAnalysisResult(null);
+
     if (file.size > 5 * 1024 * 1024) {
       toast({
         title: t('fileTooLarge'),
@@ -66,10 +71,19 @@ const SoilLab = () => {
         setIsAnalyzing(true);
         
         try {
-          // Use Gemini AI to analyze the soil
           const analysis = await analyzeSoil(imageData);
           
-          // Create a default soil analysis result with mock data if the API doesn't return all fields
+          if (!analysis.soilPresent) {
+            setNoSoilDetected(true);
+            setIsAnalyzing(false);
+            toast({
+              title: t('noSoilDetected'),
+              description: t('pleaseUploadAnImageThatClearlyShowsSoil'),
+              variant: "destructive"
+            });
+            return;
+          }
+          
           setAnalysisResult({
             soilType: analysis.soilType || 'Loamy',
             fertility: analysis.fertility || 'Medium',
@@ -77,6 +91,7 @@ const SoilLab = () => {
             recommendations: analysis.recommendations || t('soilLab.defaultRecommendation'),
             suitableCrops: analysis.suitableCrops || [t('soilLab.wheat'), t('soilLab.corn'), t('soilLab.rice')],
             imageSrc: imageData,
+            soilPresent: true,
             nutrients: {
               nitrogen: analysis.nutrients?.nitrogen || 35,
               phosphorus: analysis.nutrients?.phosphorus || 28,
@@ -133,7 +148,6 @@ const SoilLab = () => {
   const handleAnalyzeButtonClick = () => {
     if (!selectedImage || isAnalyzing) return;
     
-    // Create a mock file from the selected image
     const dataURLtoBlob = (dataURL: string) => {
       const arr = dataURL.split(',');
       const mime = arr[0].match(/:(.*?);/)?.[1] || 'image/jpeg';
@@ -415,7 +429,7 @@ const SoilLab = () => {
                   )}
                 </Button>
                 
-                <label htmlFor="camera-capture-soil">
+                <label htmlFor="camera-capture-soil" className="relative inline-block">
                   <Button 
                     className="bg-agri-blue hover:bg-agri-blue/90" 
                     disabled={isAnalyzing}
@@ -429,7 +443,7 @@ const SoilLab = () => {
                     type="file"
                     accept="image/*" 
                     capture="environment"
-                    className="hidden"
+                    className="absolute inset-0 opacity-0 w-full h-full cursor-pointer"
                     onChange={handleImageUpload}
                     disabled={isAnalyzing}
                   />
@@ -440,6 +454,12 @@ const SoilLab = () => {
           
           {/* Analysis Results Section */}
           <Card className={`lg:col-span-2 ${!analysisResult && 'flex items-center justify-center'}`}>
+            {noSoilDetected && (
+              <Alert variant="destructive" className="mb-4">
+                <AlertTitle>{t('noSoilDetected')}</AlertTitle>
+                <AlertDescription>{t('pleaseUploadAnImageThatClearlyShowsSoil')}</AlertDescription>
+              </Alert>
+            )}
             {!analysisResult ? (
               <div className="text-center p-8">
                 <Droplets className="h-16 w-16 text-agri-soil/20 mx-auto mb-4" />

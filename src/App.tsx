@@ -68,7 +68,11 @@ const App = () => (
               <Route path="/weather" element={<Weather />} />
               <Route path="/agribot" element={<AgriBot />} />
               <Route path="/founders" element={<Founders />} />
-              <Route path="/farm" element={<Farm />} />
+              <Route path="/farm" element={
+                <ProtectedRoute>
+                  <Farm />
+                </ProtectedRoute>
+              } />
               
               {/* Authentication routes */}
               <Route path="/login" element={<Login />} />
