@@ -173,6 +173,7 @@ const Founders = () => {
             src={founder.image} 
             alt={founder.name}
             className="w-full h-full object-cover object-center transition-transform hover:scale-105"
+            style={{ objectPosition: 'center' }}
             onError={(e) => {
               // Fallback to initials if image fails to load
               const target = e.target as HTMLImageElement;
