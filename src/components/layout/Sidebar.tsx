@@ -18,14 +18,16 @@ import {
   ChevronDown,
   Sprout,
   CloudRain,
-  Star
+  Star,
+  Satellite
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import './sidebar.css';
 import Logo from '../common/Logo';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { motion, AnimatePresence } from 'framer-motion';
+import { Badge } from '@/components/ui/badge';
 
 type SidebarCategory = 'main' | 'tools' | 'info';
 
@@ -36,6 +38,9 @@ type SidebarItem = {
   color: string;
   translationKey?: string;
   category: SidebarCategory;
+  featured?: boolean;
+  badge?: string;
+  description?: string;
 };
 
 const sidebarItems: SidebarItem[] = [
@@ -70,6 +75,17 @@ const sidebarItems: SidebarItem[] = [
     color: 'bg-agri-soil/10 text-agri-soil',
     translationKey: 'common.soilLab',
     category: 'tools'
+  },
+  { 
+    name: 'AgroVision', 
+    icon: Satellite, 
+    href: '/agrovision',
+    color: 'bg-gradient-to-r from-agri-teal/20 to-green-500/20 text-agri-teal',
+    translationKey: 'common.agroVision',
+    category: 'tools',
+    featured: true,
+    badge: 'New',
+    description: 'Satellite Crop Health',
   },
   { 
     name: 'Crop Advisor', 
@@ -123,8 +139,11 @@ const sidebarItems: SidebarItem[] = [
 
 const Sidebar = () => {
   const { t, i18n } = useTranslation();
+  const navigate = useNavigate();
   const [collapsed, setCollapsed] = useState(false);
-  const [activeItem, setActiveItem] = useState('Dashboard');
+  const [activeItem, setActiveItem] = useState<string | null>(() => {
+    return sessionStorage.getItem("activeItem") || "Home";
+  });
   const location = useLocation();
   const [currentLang, setCurrentLang] = useState(i18n.language);
   
@@ -212,6 +231,7 @@ const Sidebar = () => {
 
   const handleNavigation = (href: string, name: string) => {
     setActiveItem(name);
+    navigate(href);
   };
 
   // Category labels mapping
@@ -472,42 +492,36 @@ const Sidebar = () => {
                         animate="visible"
                         className="overflow-hidden"
                       >
-                        <Link
-                          to={item.href}
-                          className={cn(
-                            'flex items-center rounded-xl px-4 py-3 text-sm font-medium transition-all w-full',
-                            activeItem === item.name 
-                              ? `${item.color} shadow-md` 
-                              : 'text-white/70 hover:text-white hover:bg-white/10'
-                          )}
-                          onClick={() => handleNavigation(item.href, item.name)}
-                        >
-                          <div className={cn(
-                            'flex items-center justify-center p-2 rounded-lg transition-all',
-                            activeItem === item.name ? 'bg-white/20' : 'bg-transparent'
-                          )}>
-                            <item.icon className={cn('h-5 w-5', collapsed ? 'mx-auto' : 'mr-0')} />
-                          </div>
-                          
-                          {!collapsed && (
-                            <motion.span 
-                              initial={{ opacity: 0, x: -10 }}
-                              animate={{ opacity: 1, x: 0 }}
-                              transition={{ delay: 0.1 }}
-                              className="ml-3 whitespace-nowrap"
-                            >
-                              {item.displayName}
-                            </motion.span>
-                          )}
-                          
-                          {/* Active indicator */}
+                        <div key={item.name} className={cn("relative", 
+                          item.featured && "bg-card/30 p-2 rounded-xl mb-2",
+                          !item.featured && "mb-1")}>
                           {activeItem === item.name && (
                             <motion.div 
-                              layoutId="activeIndicator"
-                              className="absolute right-2 h-2 w-2 rounded-full bg-white"
+                              layoutId="activeItem" 
+                              className="absolute left-0 w-1 h-8 my-1 bg-primary rounded-r-full" 
                             />
                           )}
-                        </Link>
+                          <Link 
+                            to={item.href} 
+                            onClick={() => handleNavigation(item.href, item.name)}
+                            className={cn(
+                              "flex items-center gap-3 w-full hover:bg-muted/50 p-2 rounded-lg transition-all",
+                              activeItem === item.name && "bg-muted/50 dark:text-white"
+                            )}
+                          >
+                            <span className={cn("p-1 rounded-md", item.color)}>
+                              {item.icon && React.createElement(item.icon, { size: 18 })}
+                            </span>
+                            <span className={cn("font-medium truncate", collapsed && "hidden")}>
+                              {t(item.translationKey || item.name)}
+                            </span>
+                            {item.featured && (
+                              <Badge className={cn("ml-auto", collapsed && 'hidden')} variant="outline">
+                                {item.badge || t('new')}
+                              </Badge>
+                            )}
+                          </Link>
+                        </div>
                       </motion.li>
                     ))}
                   </motion.ul>

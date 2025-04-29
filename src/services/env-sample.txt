@@ -1,0 +1,12 @@
+# Satellite Imagery API keys
+VITE_SENTINEL_HUB_API_KEY=your_sentinel_hub_api_key
+VITE_SENTINEL_HUB_INSTANCE_ID=your_instance_id
+VITE_PLANET_API_KEY=your_planet_api_key 
+
+# Mapbox for more detailed maps
+VITE_MAPBOX_ACCESS_TOKEN=your_mapbox_token
+
+# Firebase config is handled separately
+
+# Optional: Enable debug mode for satellite data processing
+VITE_SATELLITE_DEBUG=false 

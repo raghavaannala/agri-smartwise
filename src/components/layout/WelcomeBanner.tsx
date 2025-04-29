@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { CloudSun, Droplets, Wind, Sun, Thermometer, Leaf, Map, ArrowRight, Loader, MapPin } from 'lucide-react';
+import { CloudSun, Droplets, Wind, Sun, Thermometer, Leaf, Map, ArrowRight, Loader, MapPin, Satellite, Globe } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { getUserProfile } from '@/lib/firestore';
 import { motion } from 'framer-motion';
@@ -7,6 +7,8 @@ import { useLocation } from '../../hooks/useLocation';
 import { getCurrentWeather } from '../../services/weatherService';
 import { useNavigate } from 'react-router-dom';
 import smartAgroXLogo from '@/assets/images/logooo.png';
+import { Badge } from '@/components/ui/badge';
+import { useTranslation } from 'react-i18next';
 
 // Define different color themes for the banner
 const colorThemes = [
@@ -432,6 +434,46 @@ const WelcomeBanner: React.FC<WelcomeBannerProps> = ({
           </div>
         </motion.div>
       </div>
+      
+      {/* AgroVision Feature Spotlight */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.6 }}
+        className={`mt-4 p-3 rounded-lg bg-${currentTheme.accent}-${currentTheme.bgOpacity} border border-${currentTheme.borderColor} relative overflow-hidden`}
+      >
+        <div className="absolute -right-6 -top-6 w-24 h-24 rounded-full bg-agri-teal/10 blur-2xl"></div>
+        
+        <div className="flex items-center mb-2">
+          <div className={`p-2 rounded-lg bg-agri-teal/20 mr-3`}>
+            <Satellite className="h-5 w-5 text-agri-teal" />
+          </div>
+          <div className="flex-1">
+            <div className="flex items-center">
+              <h3 className="font-medium text-white">AgroVision</h3>
+              <Badge className="ml-2 bg-agri-teal/20 text-white border-agri-teal/30 text-xs">
+                New
+              </Badge>
+            </div>
+            <p className="text-xs text-white/70">Satellite Crop Health Monitoring</p>
+          </div>
+        </div>
+        
+        <p className="text-sm text-white/80 mb-3">
+          Monitor your fields with real-time satellite imagery and NDVI analysis
+        </p>
+        
+        <motion.button
+          whileHover={{ scale: 1.02 }}
+          whileTap={{ scale: 0.98 }}
+          className={`flex items-center w-full justify-center text-sm text-white bg-agri-teal/40 hover:bg-agri-teal/60 py-1.5 px-3 rounded-md transition-colors`}
+          onClick={() => navigate('/agrovision')}
+        >
+          <Globe className="h-4 w-4 mr-2" />
+          Launch AgroVision
+          <ArrowRight className="h-4 w-4 ml-1" />
+        </motion.button>
+      </motion.div>
     </motion.div>
   );
 };

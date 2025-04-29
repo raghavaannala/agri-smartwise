@@ -42,7 +42,8 @@ import {
   RefreshCw,
   Activity,
   PanelTop,
-  TrendingUp
+  TrendingUp,
+  Satellite
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -499,6 +500,57 @@ const Index = () => {
   const renderDashboardCards = () => {
     // Define cards data
     const cards = [
+      {
+        id: 'agrovision',
+        title: t('agroVision.title', 'AgroVision: Satellite Crop Health'),
+        icon: <Satellite className="h-5 w-5 text-agri-teal" />,
+        gradient: "from-agri-teal/20 to-agri-green/20",
+        featured: true, // Highlight this as a featured card
+        content: (
+          <div>
+            <div className="mb-4 bg-gradient-to-r from-agri-teal/10 to-agri-green/10 rounded-lg p-3">
+              <h3 className="font-medium text-agri-teal flex items-center">
+                <Globe className="h-4 w-4 mr-2" />
+                {t('agroVision.realTimeSatellite', 'Real-Time Satellite Monitoring')}
+              </h3>
+              <p className="text-sm text-gray-600 mt-1">{t('agroVision.monitorDescription', 'Monitor your fields with satellite imagery and NDVI analysis')}</p>
+            </div>
+            
+            <div className="grid grid-cols-2 gap-2 mb-4">
+              <div className="bg-gray-50 p-2 rounded-lg">
+                <div className="text-xs text-gray-500">{t('agroVision.fieldsMonitored', 'Fields Monitored')}</div>
+                <div className="font-medium text-lg">2</div>
+              </div>
+              <div className="bg-gray-50 p-2 rounded-lg">
+                <div className="text-xs text-gray-500">{t('agroVision.lastUpdated', 'Last Updated')}</div>
+                <div className="font-medium text-sm">{t('common.today')}</div>
+              </div>
+            </div>
+            
+            <div className="relative h-24 bg-gray-100 rounded-lg overflow-hidden mb-3">
+              <img 
+                src="/images/ndvi-sample.jpg" 
+                alt="NDVI Map" 
+                className="w-full h-full object-cover"
+                onError={(e) => {
+                  e.currentTarget.src = 'https://via.placeholder.com/400x150?text=NDVI+Map';
+                }}
+              />
+              <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent p-2">
+                <div className="text-white text-xs font-medium">{t('agroVision.healthStatus', 'Health Status')}: {t('common.excellent')}</div>
+              </div>
+            </div>
+            
+            <Button 
+              className="w-full bg-agri-teal hover:bg-agri-teal/90"
+              onClick={() => navigate('/agrovision')}
+            >
+              <MapPin className="mr-2 h-4 w-4" />
+              {t('agroVision.openSatelliteView', 'Open Satellite View')}
+            </Button>
+          </div>
+        ),
+      },
       {
         id: 'soil',
         title: t('soilLab.title'),

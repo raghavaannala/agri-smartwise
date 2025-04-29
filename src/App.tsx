@@ -19,6 +19,7 @@ import Weather from "./pages/Weather";
 import AgriBot from "./pages/AgriBot";
 import Founders from "./pages/Founders";
 import Farm from "./pages/Farm";
+import AgroVision from "./pages/AgroVision";
 import { AuthProvider } from "./contexts/AuthContext";
 import { LanguageProvider } from "./contexts/LanguageContext";
 import ProtectedRoute from "./components/auth/ProtectedRoute";
@@ -71,6 +72,11 @@ const App = () => (
               <Route path="/farm" element={
                 <ProtectedRoute>
                   <Farm />
+                </ProtectedRoute>
+              } />
+              <Route path="/agrovision" element={
+                <ProtectedRoute>
+                  <AgroVision />
                 </ProtectedRoute>
               } />
               

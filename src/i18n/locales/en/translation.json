@@ -15,6 +15,7 @@
     "profile": "Profile",
     "settings": "Settings",
     "farm": "Farm",
+    "agroVision": "AgroVision",
     "selectLanguage": "Select Language",
     "collapse": "Collapse",
     "active": "Active",
@@ -31,7 +32,8 @@
     "diseaseScan": "Disease Scan",
     "cropAdvisor": "Crop Advisor",
     "overview": "Overview",
-    "viewFullReport": "View Full Report"
+    "viewFullReport": "View Full Report",
+    "help": "Help"
   },
   "founders": {
     "title": "Meet Our Founders",
@@ -286,5 +288,39 @@
     "processingError": "There was an error processing your request. Please try again.",
     "loginPrompt": "Please login for personalized recommendations.",
     "respondIn": "Respond in English"
+  },
+  "agroVision": {
+    "title": "AgroVision: Satellite Crop Health",
+    "subtitle": "Monitor your crop health with satellite-based vegetation index analytics",
+    "selectFarm": "Select Farm",
+    "selectFarmPlaceholder": "Select a farm",
+    "selectDate": "Select Date",
+    "status": "Status",
+    "loadingData": "Loading data...",
+    "readyToAnalyze": "Ready to analyze",
+    "selectFarmToBegin": "Select a farm to begin",
+    "noFarmsWarning": "You need to create a farm first.",
+    "satelliteMap": "Satellite Map",
+    "ndviAnalytics": "NDVI Analytics",
+    "initializeMap": "Initialize Map",
+    "viewingDate": "Viewing data for",
+    "mapView": "Satellite Map View",
+    "mapDescription": "View your farm fields with NDVI (vegetation health) overlay from satellite imagery.",
+    "analyticsDescription": "Historical vegetation health data and crop performance analytics.",
+    "fieldHealth": "Field Health",
+    "averageNdvi": "Average NDVI",
+    "lastUpdated": "Last Updated",
+    "ndviLegend": "NDVI Legend",
+    "healthTrend": "Health Trend",
+    "ndviExcellent": "Excellent (>0.8)",
+    "ndviGood": "Good (0.6-0.8)",
+    "ndviModerate": "Moderate (0.4-0.6)",
+    "ndviPoor": "Poor (0.2-0.4)",
+    "ndviVeryPoor": "Very Poor (<0.2)",
+    "allFields": "All Fields",
+    "selectField": "Select Field",
+    "timeRange": "Time Range",
+    "fieldSummary": "Field Summary",
+    "drawFields": "Draw field boundaries on the map to generate NDVI analysis"
   }
 }
