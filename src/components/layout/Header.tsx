@@ -17,6 +17,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { getAllFounders } from '@/services/foundersService';
+import { useMediaQuery } from '@/hooks/useMediaQuery';
 
 const Header = () => {
   const { currentLanguage, changeLanguage, languages } = useLanguage();
@@ -26,6 +27,7 @@ const Header = () => {
   const { currentUser, logout } = useAuth();
   const navigate = useNavigate();
   const [lastUpdate, setLastUpdate] = useState(Date.now());
+  const isMobile = useMediaQuery('(max-width: 768px)');
   
   useEffect(() => {
     const fetchUserProfile = async () => {
@@ -90,7 +92,7 @@ const Header = () => {
   };
   
   return (
-    <header className="bg-gradient-to-r from-green-50 to-amber-50 border-b border-green-200 h-16 flex items-center px-4 md:px-6 relative overflow-hidden">
+    <header className="bg-gradient-to-r from-green-50 to-amber-50 border-b border-green-200 h-16 flex items-center px-2 md:px-6 relative overflow-hidden">
       {/* Nature-themed decorative elements */}
       <div className="absolute inset-0 z-0 overflow-hidden">
         {/* Subtle leaf patterns */}
@@ -121,13 +123,13 @@ const Header = () => {
         </Link>
       </div>
 
-      <div className="flex items-center space-x-4 z-10">
+      <div className="flex items-center space-x-2 md:space-x-4 z-10">
         {/* Language Selector */}
         <DropdownMenu>
           <DropdownMenuTrigger className="flex items-center text-green-700 hover:text-green-800 transition-colors">
-            <Globe className="h-5 w-5 mr-1" />
-            <span className="hidden md:inline-block text-sm">{currentLanguage.name}</span>
-            <ChevronDown className="h-4 w-4 ml-1" />
+            <Globe className="h-5 w-5" />
+            <span className="hidden md:inline-block text-sm ml-1">{currentLanguage.name}</span>
+            <ChevronDown className="h-4 w-4 ml-1 hidden md:inline-block" />
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
             <DropdownMenuLabel>{t('selectLanguage')}</DropdownMenuLabel>
@@ -198,8 +200,8 @@ const Header = () => {
                   {getInitials(userName)}
                 </AvatarFallback>
               </Avatar>
-              <span className="hidden md:inline-block ml-2 text-sm font-medium">{userName}</span>
-              <ChevronDown className="h-4 w-4 ml-1" />
+              <span className="ml-2 hidden md:inline-block">{userName}</span>
+              <ChevronDown className="h-4 w-4 ml-1 hidden md:inline-block" />
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuLabel>{t('myAccount')}</DropdownMenuLabel>
@@ -218,14 +220,24 @@ const Header = () => {
             </DropdownMenuContent>
           </DropdownMenu>
         ) : (
-          <Button 
-            variant="outline" 
-            className="flex items-center text-green-700 border-green-300 hover:bg-green-100"
-            onClick={() => navigate('/login')}
-          >
-            <LogIn className="h-4 w-4 mr-2" />
-            {t('login')}
-          </Button>
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button 
+                  variant="outline" 
+                  className="bg-white/90 hover:bg-white border-green-200 hover:border-green-300 text-green-700 hover:text-green-800"
+                  onClick={() => navigate('/login')}
+                  size={isMobile ? "sm" : "default"}
+                >
+                  <span className="hidden md:inline-block">{t('login')}</span>
+                  <LogIn className={`${isMobile ? 'h-4 w-4' : 'h-4 w-4 ml-2 md:ml-0 md:mr-2'}`} />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>{t('loginTooltip')}</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
         )}
       </div>
     </header>

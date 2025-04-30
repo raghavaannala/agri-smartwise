@@ -5,6 +5,7 @@ import Footer from './Footer';
 import AgribotChat from '../dashboard/AgribotChat';
 import VoiceAssistant from '../voice/VoiceAssistant';
 import { AnimatePresence, motion } from 'framer-motion';
+import { useMediaQuery } from '@/hooks/useMediaQuery';
 
 type MainLayoutProps = {
   children: React.ReactNode;
@@ -13,6 +14,7 @@ type MainLayoutProps = {
 const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
   // State to track if content is ready (for animations)
   const [contentReady, setContentReady] = useState(false);
+  const isMobile = useMediaQuery('(max-width: 768px)');
   
   // Set content ready after a small delay for animation purposes
   useEffect(() => {
@@ -24,7 +26,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
   }, []);
 
   return (
-    <div className="flex min-h-screen bg-gray-50 overflow-hidden">
+    <div className="flex min-h-screen bg-gray-50 overflow-hidden flex-col md:flex-row">
       <Sidebar />
       
       <AnimatePresence>
@@ -41,15 +43,15 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.4, delay: 0.3 }}
-              className="flex-1 p-4 md:p-6 overflow-y-auto"
+              className="flex-1 p-3 md:p-6 overflow-y-auto"
             >
               {children}
             </motion.main>
             
             <Footer />
             
-            {/* Assistants with floating positions*/}
-            <div className="assistants-container">
+            {/* Assistants with floating positions - adjust for mobile */}
+            <div className={`assistants-container ${isMobile ? 'bottom-16 right-2' : 'bottom-4 right-4'}`}>
               <AgribotChat />
               <VoiceAssistant />
             </div>

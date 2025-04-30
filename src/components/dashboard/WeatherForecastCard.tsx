@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { CloudSun, Cloud, CloudRain, CloudLightning, CloudSnow, Thermometer, MapPin } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { getUserProfile } from '@/lib/firestore';
+import { useMediaQuery } from '@/hooks/useMediaQuery';
 
 type WeatherDay = {
   day: string;
@@ -70,6 +71,7 @@ const getWeatherIcon = (type: string) => {
 const WeatherForecastCard = () => {
   const [location, setLocation] = useState('Loading location...');
   const { currentUser } = useAuth();
+  const isMobile = useMediaQuery('(max-width: 640px)');
   
   useEffect(() => {
     const fetchUserLocation = async () => {
@@ -97,17 +99,17 @@ const WeatherForecastCard = () => {
         <CardTitle className="text-lg font-semibold text-agri-blue">
           <div className="flex items-center">
             <CloudSun className="mr-2 h-5 w-5" />
-            5-Day Weather Forecast
+            {isMobile ? 'Weather' : '5-Day Weather Forecast'}
           </div>
         </CardTitle>
         <span className="text-xs bg-agri-blue/10 text-agri-blue px-2 py-1 rounded-full flex items-center">
           <MapPin className="h-3 w-3 mr-1" />
-          {location}
+          {isMobile ? location.split(',')[0] : location}
         </span>
       </CardHeader>
       <CardContent>
-        <div className="grid grid-cols-5 gap-2">
-          {weatherForecast.map((day) => (
+        <div className={`grid ${isMobile ? 'grid-cols-3 gap-1' : 'grid-cols-5 gap-2'}`}>
+          {weatherForecast.slice(0, isMobile ? 3 : 5).map((day) => (
             <div 
               key={day.day} 
               className="flex flex-col items-center p-2 rounded-lg bg-gray-50"
@@ -127,12 +129,11 @@ const WeatherForecastCard = () => {
         
         <div className="mt-4 bg-blue-50 rounded-lg p-3">
           <div className="flex items-start">
-            <CloudRain className="h-5 w-5 text-blue-500 mr-2 mt-0.5" />
+            <CloudRain className={`${isMobile ? 'h-4 w-4' : 'h-5 w-5'} text-blue-500 mr-2 mt-0.5`} />
             <div>
-              <p className="text-sm font-medium text-blue-700">Rainfall Alert</p>
-              <p className="text-xs text-blue-600">
-                Moderate to heavy rainfall expected on Wednesday and Thursday. 
-                Consider delaying any planned spraying activities.
+              <p className={`${isMobile ? 'text-xs' : 'text-sm'} font-medium text-blue-700`}>Rainfall Alert</p>
+              <p className={`${isMobile ? 'text-xs' : 'text-sm'} text-blue-600`}>
+                {isMobile ? 'Rain expected Wed-Thu' : 'Moderate to heavy rainfall expected on Wednesday and Thursday. Consider delaying any planned spraying activities.'}
               </p>
             </div>
           </div>

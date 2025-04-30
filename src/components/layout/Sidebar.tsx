@@ -19,7 +19,8 @@ import {
   Sprout,
   CloudRain,
   Star,
-  Satellite
+  Satellite,
+  Menu
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import './sidebar.css';
@@ -28,6 +29,8 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Badge } from '@/components/ui/badge';
+import { useMediaQuery } from '@/hooks/useMediaQuery';
+import { CSSTransition } from 'react-transition-group';
 
 type SidebarCategory = 'main' | 'tools' | 'info';
 
@@ -225,8 +228,38 @@ const Sidebar = () => {
     }
   }, [location.pathname, translatedSidebarItems]);
 
+  const isMobile = useMediaQuery('(max-width: 768px)');
+  const [showMobileSidebar, setShowMobileSidebar] = useState(false);
+
+  useEffect(() => {
+    // Close sidebar when navigating on mobile
+    if (isMobile) {
+      setCollapsed(true);
+      // Listen for route changes to close mobile sidebar
+      const handleRouteChange = () => {
+        setShowMobileSidebar(false);
+      };
+      window.addEventListener('popstate', handleRouteChange);
+      return () => {
+        window.removeEventListener('popstate', handleRouteChange);
+      };
+    } else {
+      // On desktop, use the stored preference or default to expanded
+      const storedCollapsed = localStorage.getItem('sidebarCollapsed');
+      if (storedCollapsed) {
+        setCollapsed(storedCollapsed === 'true');
+      }
+    }
+  }, [isMobile]);
+
   const toggleSidebar = () => {
-    setCollapsed(!collapsed);
+    if (isMobile) {
+      setShowMobileSidebar(!showMobileSidebar);
+    } else {
+      const newCollapsedState = !collapsed;
+      setCollapsed(newCollapsedState);
+      localStorage.setItem('sidebarCollapsed', String(newCollapsedState));
+    }
   };
 
   const handleNavigation = (href: string, name: string) => {
@@ -255,291 +288,320 @@ const Sidebar = () => {
   };
 
   return (
-    <motion.div 
-      initial={{ width: collapsed ? 80 : 280 }}
-      animate={{ width: collapsed ? 80 : 280 }}
-      transition={{ duration: 0.3, ease: "easeInOut" }}
-      className={cn(
-        "flex flex-col min-h-screen h-auto bg-gradient-to-b from-agri-darkGreen to-agri-green/90 border-r border-agri-lime/20 overflow-hidden",
-        "shadow-xl"
+    <>
+      {/* Mobile menu toggle button - visible only on mobile */}
+      {isMobile && (
+        <button 
+          className="fixed top-4 left-4 z-50 bg-white p-2 rounded-md shadow-md text-agri-green"
+          onClick={toggleSidebar}
+          aria-label="Toggle menu"
+        >
+          <Menu size={20} />
+        </button>
       )}
-    >
-      {/* Header with logo and toggle button */}
-      <div className="flex flex-col p-5 border-b border-agri-lime/30">
-        <div className={cn("flex items-center", collapsed ? "justify-center w-full" : "justify-between w-full")}>
-          <Logo size={collapsed ? 'sm' : 'md'} />
-          {!collapsed && 
-            <motion.span 
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="ml-2 text-xl font-semibold text-white"
-            >
-              
-            </motion.span>
-          }
-        </div>
-        
-        {/* Toggle button with improved styling */}
-        <div className="flex justify-center mt-3">
-          <motion.button 
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-            onClick={toggleSidebar}
-            className={cn(
-              "flex items-center justify-center p-2 rounded-lg transition-all duration-300",
-              "bg-agri-lime/20 hover:bg-agri-lime/30 text-white",
-              "focus:outline-none focus:ring-2 focus:ring-agri-lime/50",
-              collapsed ? "w-10" : "w-full"
-            )}
-            aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-          >
-            {collapsed ? <PanelLeftOpen size={18} /> : <PanelLeftClose size={18} />}
-          </motion.button>
-        </div>
-      </div>
       
-      {/* Enhanced Founders Section */}
-      {foundersItem && (
-        <div className="px-3 pt-5 pb-4 relative">
-          {/* Decorative background elements */}
-          <div className="absolute inset-0 overflow-hidden">
-            <div className="absolute -right-10 -top-10 w-32 h-32 bg-amber-400/20 rounded-full blur-xl"></div>
-            <div className="absolute -left-5 bottom-0 w-20 h-20 bg-amber-300/10 rounded-full blur-lg"></div>
-          </div>
-
-          {!collapsed && (
-            <motion.div 
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              className="px-3 mb-2 flex items-center"
-            >
-              <motion.div
-                animate={{ rotate: 360 }}
-                transition={{ duration: 8, repeat: Infinity, ease: "linear" }}
-              >
-                <Star className="h-4 w-4 mr-2 text-amber-400" />
-              </motion.div>
-              <span className="text-xs uppercase tracking-wider font-bold text-amber-300">
-                {t('sidebar.featured', 'Featured')}
-              </span>
-            </motion.div>
+      {/* Mobile overlay */}
+      {isMobile && showMobileSidebar && (
+        <div 
+          className="sidebar-overlay"
+          onClick={() => setShowMobileSidebar(false)}
+        />
+      )}
+      
+      {/* Sidebar content */}
+      <CSSTransition
+        in={isMobile ? showMobileSidebar : true}
+        timeout={300}
+        classNames="sidebar"
+        unmountOnExit={isMobile}
+      >
+        <motion.div 
+          initial={{ width: collapsed ? 80 : 280 }}
+          animate={{ width: collapsed ? 80 : 280 }}
+          transition={{ duration: 0.3, ease: "easeInOut" }}
+          className={cn(
+            "flex flex-col min-h-screen h-auto bg-gradient-to-b from-agri-darkGreen to-agri-green/90 border-r border-agri-lime/20 overflow-hidden",
+            "shadow-xl"
           )}
-          
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2 }}
-            whileHover={{
-              scale: 1.03,
-              transition: { duration: 0.2 },
-              boxShadow: "0 10px 25px -5px rgba(251, 191, 36, 0.3)"
-            }}
-            className="mb-2 relative z-10"
-          >
-            <Link
-              to={foundersItem.href}
-              className={cn(
-                'flex items-center rounded-xl px-4 py-4 text-sm font-medium transition-all w-full',
-                'relative overflow-hidden',
-                activeItem === foundersItem.name 
-                  ? `bg-gradient-to-r from-amber-500/40 to-amber-600/50 text-white shadow-lg shadow-amber-900/30 border border-amber-500/30` 
-                  : 'text-white bg-gradient-to-r from-amber-600/30 to-amber-700/30 hover:from-amber-500/40 hover:to-amber-600/50 shadow-lg shadow-amber-900/20 border border-amber-500/20 hover:border-amber-400/30'
-              )}
-              onClick={() => handleNavigation(foundersItem.href, foundersItem.name)}
-            >
-              {/* Animated background particles */}
-              <div className="absolute inset-0 overflow-hidden">
-                {[...Array(5)].map((_, i) => (
-                  <motion.div
-                    key={i}
-                    className="absolute h-1 w-1 rounded-full bg-amber-300"
-                    initial={{ 
-                      x: `${Math.random() * 100}%`, 
-                      y: `${Math.random() * 100}%`,
-                      opacity: 0.3 + Math.random() * 0.5
-                    }}
-                    animate={{ 
-                      y: [
-                        `${Math.random() * 100}%`, 
-                        `${Math.random() * 100}%`
-                      ],
-                      opacity: [0.3, 0.7, 0.3]
-                    }}
-                    transition={{ 
-                      duration: 3 + Math.random() * 2, 
-                      repeat: Infinity,
-                      ease: "easeInOut"
-                    }}
-                  />
-                ))}
-              </div>
-              
-              {/* Icon with pulsing effect */}
-              <motion.div 
+        >
+          {/* Header with logo and toggle button */}
+          <div className="flex flex-col p-5 border-b border-agri-lime/30">
+            <div className={cn("flex items-center", collapsed ? "justify-center w-full" : "justify-between w-full")}>
+              <Logo size={collapsed ? 'sm' : 'md'} />
+              {!collapsed && 
+                <motion.span 
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="ml-2 text-xl font-semibold text-white"
+                >
+                  
+                </motion.span>
+              }
+            </div>
+            
+            {/* Toggle button with improved styling */}
+            <div className="flex justify-center mt-3">
+              <motion.button 
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={toggleSidebar}
                 className={cn(
-                  'flex items-center justify-center p-3 rounded-lg',
-                  activeItem === foundersItem.name 
-                    ? 'bg-amber-400/30' 
-                    : 'bg-amber-400/20'
+                  "flex items-center justify-center p-2 rounded-lg transition-all duration-300",
+                  "bg-agri-lime/20 hover:bg-agri-lime/30 text-white",
+                  "focus:outline-none focus:ring-2 focus:ring-agri-lime/50",
+                  collapsed ? "w-10" : "w-full"
                 )}
-                animate={{ 
-                  boxShadow: [
-                    "0 0 0 0 rgba(251, 191, 36, 0)",
-                    "0 0 0 6px rgba(251, 191, 36, 0.3)",
-                    "0 0 0 0 rgba(251, 191, 36, 0)"
-                  ]
-                }}
-                transition={{ 
-                  duration: 2, 
-                  repeat: Infinity, 
-                  ease: "easeInOut"
-                }}
+                aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
               >
-                <foundersItem.icon className={cn('h-6 w-6', collapsed ? 'mx-auto' : 'mr-0')} />
-              </motion.div>
-              
-              {!collapsed && (
-                <motion.div className="ml-3 flex flex-col">
-                  <span className="font-bold whitespace-nowrap flex items-center text-lg">
-                    {foundersItem.displayName}
-                    <motion.div
-                      animate={{ scale: [1, 1.2, 1] }}
-                      transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }}
-                    >
-                      <Star className="h-3.5 w-3.5 ml-1.5 text-amber-300" />
-                    </motion.div>
-                  </span>
-                  <span className="text-xs text-amber-200/90">
-                    {t('sidebar.meetTeam', 'Meet our team')}
-                  </span>
-                </motion.div>
-              )}
-              
-              {/* Active indicator */}
-              {activeItem === foundersItem.name && (
-                <motion.div 
-                  layoutId="activeIndicator"
-                  className="absolute right-3 h-2 w-2 rounded-full bg-amber-400"
-                />
-              )}
-              
-              {/* Animated glow effect */}
-              <motion.div 
-                className="absolute -inset-1 bg-amber-500/10 rounded-full blur-md"
-                animate={{ 
-                  opacity: [0.3, 0.6, 0.3],
-                  scale: [1, 1.05, 1]
-                }}
-                transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
-              ></motion.div>
-            </Link>
-          </motion.div>
-        </div>
-      )}
-      
-      {/* Separator */}
-      <div className="mx-4 h-px bg-agri-lime/20 my-3"></div>
-      
-      {/* Navigation with categorized items */}
-      <nav className="flex-1 overflow-y-auto py-4 px-3 scrollbar-hide">
-        <AnimatePresence>
-          {/* Render each category */}
-          {Object.entries(categorizedItems).map(([category, items], categoryIndex) => (
-            <div key={category} className="mb-6">
-              {/* Category header */}
+                {collapsed ? <PanelLeftOpen size={18} /> : <PanelLeftClose size={18} />}
+              </motion.button>
+            </div>
+          </div>
+          
+          {/* Enhanced Founders Section */}
+          {foundersItem && (
+            <div className="px-3 pt-5 pb-4 relative">
+              {/* Decorative background elements */}
+              <div className="absolute inset-0 overflow-hidden">
+                <div className="absolute -right-10 -top-10 w-32 h-32 bg-amber-400/20 rounded-full blur-xl"></div>
+                <div className="absolute -left-5 bottom-0 w-20 h-20 bg-amber-300/10 rounded-full blur-lg"></div>
+              </div>
+
               {!collapsed && (
                 <motion.div 
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  className="px-4 mb-3 flex items-center justify-between"
+                  className="px-3 mb-2 flex items-center"
                 >
-                  <div className="flex items-center text-white/80">
-                    {React.createElement(categoryLabels[category as SidebarCategory].icon, { className: "h-4 w-4 mr-2" })}
-                    <span className="text-xs uppercase tracking-wider font-semibold">
-                      {categoryLabels[category as SidebarCategory].name}
-                    </span>
-                  </div>
-                  <button 
-                    onClick={() => toggleCategory(category as SidebarCategory)}
-                    className="text-white/60 hover:text-white transition-colors"
+                  <motion.div
+                    animate={{ rotate: 360 }}
+                    transition={{ duration: 8, repeat: Infinity, ease: "linear" }}
                   >
-                    {expandedCategories[category as SidebarCategory] ? 
-                      <ChevronDown size={16} /> : 
-                      <ChevronRight size={16} />
-                    }
-                  </button>
+                    <Star className="h-4 w-4 mr-2 text-amber-400" />
+                  </motion.div>
+                  <span className="text-xs uppercase tracking-wider font-bold text-amber-300">
+                    {t('sidebar.featured', 'Featured')}
+                  </span>
                 </motion.div>
               )}
               
-              {/* Category items */}
-              <AnimatePresence>
-                {(collapsed || expandedCategories[category as SidebarCategory]) && (
-                  <motion.ul 
-                    initial={{ height: 0, opacity: 0 }}
-                    animate={{ height: 'auto', opacity: 1 }}
-                    exit={{ height: 0, opacity: 0 }}
-                    transition={{ duration: 0.3 }}
-                    className="space-y-2 px-2 overflow-hidden"
-                  >
-                    {items.map((item, index) => (
-                      <motion.li 
-                        key={item.name}
-                        custom={index}
-                        variants={itemVariants}
-                        initial="hidden"
-                        animate="visible"
-                        className="overflow-hidden"
-                      >
-                        <div key={item.name} className={cn("relative", 
-                          item.featured && "bg-card/30 p-2 rounded-xl mb-2",
-                          !item.featured && "mb-1")}>
-                          {activeItem === item.name && (
-                            <motion.div 
-                              layoutId="activeItem" 
-                              className="absolute left-0 w-1 h-8 my-1 bg-primary rounded-r-full" 
-                            />
-                          )}
-                          <Link 
-                            to={item.href} 
-                            onClick={() => handleNavigation(item.href, item.name)}
-                            className={cn(
-                              "flex items-center gap-3 w-full hover:bg-muted/50 p-2 rounded-lg transition-all",
-                              activeItem === item.name && "bg-muted/50 dark:text-white"
-                            )}
-                          >
-                            <span className={cn("p-1 rounded-md", item.color)}>
-                              {item.icon && React.createElement(item.icon, { size: 18 })}
-                            </span>
-                            <span className={cn("font-medium truncate", collapsed && "hidden")}>
-                              {t(item.translationKey || item.name)}
-                            </span>
-                            {item.featured && (
-                              <Badge className={cn("ml-auto", collapsed && 'hidden')} variant="outline">
-                                {item.badge || t('new')}
-                              </Badge>
-                            )}
-                          </Link>
-                        </div>
-                      </motion.li>
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.2 }}
+                whileHover={{
+                  scale: 1.03,
+                  transition: { duration: 0.2 },
+                  boxShadow: "0 10px 25px -5px rgba(251, 191, 36, 0.3)"
+                }}
+                className="mb-2 relative z-10"
+              >
+                <Link
+                  to={foundersItem.href}
+                  className={cn(
+                    'flex items-center rounded-xl px-4 py-4 text-sm font-medium transition-all w-full',
+                    'relative overflow-hidden',
+                    activeItem === foundersItem.name 
+                      ? `bg-gradient-to-r from-amber-500/40 to-amber-600/50 text-white shadow-lg shadow-amber-900/30 border border-amber-500/30` 
+                      : 'text-white bg-gradient-to-r from-amber-600/30 to-amber-700/30 hover:from-amber-500/40 hover:to-amber-600/50 shadow-lg shadow-amber-900/20 border border-amber-500/20 hover:border-amber-400/30'
+                  )}
+                  onClick={() => handleNavigation(foundersItem.href, foundersItem.name)}
+                >
+                  {/* Animated background particles */}
+                  <div className="absolute inset-0 overflow-hidden">
+                    {[...Array(5)].map((_, i) => (
+                      <motion.div
+                        key={i}
+                        className="absolute h-1 w-1 rounded-full bg-amber-300"
+                        initial={{ 
+                          x: `${Math.random() * 100}%`, 
+                          y: `${Math.random() * 100}%`,
+                          opacity: 0.3 + Math.random() * 0.5
+                        }}
+                        animate={{ 
+                          y: [
+                            `${Math.random() * 100}%`, 
+                            `${Math.random() * 100}%`
+                          ],
+                          opacity: [0.3, 0.7, 0.3]
+                        }}
+                        transition={{ 
+                          duration: 3 + Math.random() * 2, 
+                          repeat: Infinity,
+                          ease: "easeInOut"
+                        }}
+                      />
                     ))}
-                  </motion.ul>
-                )}
-              </AnimatePresence>
+                  </div>
+                  
+                  {/* Icon with pulsing effect */}
+                  <motion.div 
+                    className={cn(
+                      'flex items-center justify-center p-3 rounded-lg',
+                      activeItem === foundersItem.name 
+                        ? 'bg-amber-400/30' 
+                        : 'bg-amber-400/20'
+                    )}
+                    animate={{ 
+                      boxShadow: [
+                        "0 0 0 0 rgba(251, 191, 36, 0)",
+                        "0 0 0 6px rgba(251, 191, 36, 0.3)",
+                        "0 0 0 0 rgba(251, 191, 36, 0)"
+                      ]
+                    }}
+                    transition={{ 
+                      duration: 2, 
+                      repeat: Infinity, 
+                      ease: "easeInOut"
+                    }}
+                  >
+                    <foundersItem.icon className={cn('h-6 w-6', collapsed ? 'mx-auto' : 'mr-0')} />
+                  </motion.div>
+                  
+                  {!collapsed && (
+                    <motion.div className="ml-3 flex flex-col">
+                      <span className="font-bold whitespace-nowrap flex items-center text-lg">
+                        {foundersItem.displayName}
+                        <motion.div
+                          animate={{ scale: [1, 1.2, 1] }}
+                          transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }}
+                        >
+                          <Star className="h-3.5 w-3.5 ml-1.5 text-amber-300" />
+                        </motion.div>
+                      </span>
+                      <span className="text-xs text-amber-200/90">
+                        {t('sidebar.meetTeam', 'Meet our team')}
+                      </span>
+                    </motion.div>
+                  )}
+                  
+                  {/* Active indicator */}
+                  {activeItem === foundersItem.name && (
+                    <motion.div 
+                      layoutId="activeIndicator"
+                      className="absolute right-3 h-2 w-2 rounded-full bg-amber-400"
+                    />
+                  )}
+                  
+                  {/* Animated glow effect */}
+                  <motion.div 
+                    className="absolute -inset-1 bg-amber-500/10 rounded-full blur-md"
+                    animate={{ 
+                      opacity: [0.3, 0.6, 0.3],
+                      scale: [1, 1.05, 1]
+                    }}
+                    transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
+                  ></motion.div>
+                </Link>
+              </motion.div>
             </div>
-          ))}
-        </AnimatePresence>
-        
-        {/* Extra spacing to increase vertical size */}
-        <div className="h-20"></div>
-      </nav>
-      
-      {/* Footer with version */}
-      <div className="p-4 border-t border-agri-lime/20 text-white/50 text-xs text-center mt-auto">
-        {!collapsed && <span>v1.0.0</span>}
-      </div>
-    </motion.div>
+          )}
+          
+          {/* Separator */}
+          <div className="mx-4 h-px bg-agri-lime/20 my-3"></div>
+          
+          {/* Navigation with categorized items */}
+          <nav className="flex-1 overflow-y-auto py-4 px-3 scrollbar-hide">
+            <AnimatePresence>
+              {/* Render each category */}
+              {Object.entries(categorizedItems).map(([category, items], categoryIndex) => (
+                <div key={category} className="mb-6">
+                  {/* Category header */}
+                  {!collapsed && (
+                    <motion.div 
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      className="px-4 mb-3 flex items-center justify-between"
+                    >
+                      <div className="flex items-center text-white/80">
+                        {React.createElement(categoryLabels[category as SidebarCategory].icon, { className: "h-4 w-4 mr-2" })}
+                        <span className="text-xs uppercase tracking-wider font-semibold">
+                          {categoryLabels[category as SidebarCategory].name}
+                        </span>
+                      </div>
+                      <button 
+                        onClick={() => toggleCategory(category as SidebarCategory)}
+                        className="text-white/60 hover:text-white transition-colors"
+                      >
+                        {expandedCategories[category as SidebarCategory] ? 
+                          <ChevronDown size={16} /> : 
+                          <ChevronRight size={16} />
+                        }
+                      </button>
+                    </motion.div>
+                  )}
+                  
+                  {/* Category items */}
+                  <AnimatePresence>
+                    {(collapsed || expandedCategories[category as SidebarCategory]) && (
+                      <motion.ul 
+                        initial={{ height: 0, opacity: 0 }}
+                        animate={{ height: 'auto', opacity: 1 }}
+                        exit={{ height: 0, opacity: 0 }}
+                        transition={{ duration: 0.3 }}
+                        className="space-y-2 px-2 overflow-hidden"
+                      >
+                        {items.map((item, index) => (
+                          <motion.li 
+                            key={item.name}
+                            custom={index}
+                            variants={itemVariants}
+                            initial="hidden"
+                            animate="visible"
+                            className="overflow-hidden"
+                          >
+                            <div key={item.name} className={cn("relative", 
+                              item.featured && "bg-card/30 p-2 rounded-xl mb-2",
+                              !item.featured && "mb-1")}>
+                              {activeItem === item.name && (
+                                <motion.div 
+                                  layoutId="activeItem" 
+                                  className="absolute left-0 w-1 h-8 my-1 bg-primary rounded-r-full" 
+                                />
+                              )}
+                              <Link 
+                                to={item.href} 
+                                onClick={() => handleNavigation(item.href, item.name)}
+                                className={cn(
+                                  "flex items-center gap-3 w-full hover:bg-muted/50 p-2 rounded-lg transition-all",
+                                  activeItem === item.name && "bg-muted/50 dark:text-white"
+                                )}
+                              >
+                                <span className={cn("p-1 rounded-md", item.color)}>
+                                  {item.icon && React.createElement(item.icon, { size: 18 })}
+                                </span>
+                                <span className={cn("font-medium truncate", collapsed && "hidden")}>
+                                  {t(item.translationKey || item.name)}
+                                </span>
+                                {item.featured && (
+                                  <Badge className={cn("ml-auto", collapsed && 'hidden')} variant="outline">
+                                    {item.badge || t('new')}
+                                  </Badge>
+                                )}
+                              </Link>
+                            </div>
+                          </motion.li>
+                        ))}
+                      </motion.ul>
+                    )}
+                  </AnimatePresence>
+                </div>
+              ))}
+            </AnimatePresence>
+            
+            {/* Extra spacing to increase vertical size */}
+            <div className="h-20"></div>
+          </nav>
+          
+          {/* Footer with version */}
+          <div className="p-4 border-t border-agri-lime/20 text-white/50 text-xs text-center mt-auto">
+            {!collapsed && <span>v1.0.0</span>}
+          </div>
+        </motion.div>
+      </CSSTransition>
+    </>
   );
 };
 
