@@ -23,6 +23,7 @@ type SoilAnalysisResult = {
   recommendations: string;
   suitableCrops: string[];
   imageSrc: string | null;
+  confidenceScore?: number;
   nutrients?: {
     nitrogen: number;
     phosphorus: number;
@@ -45,6 +46,7 @@ type PesticideResult = {
   preventionTips: string;
   severity: 'Low' | 'Medium' | 'High';
   imageSrc: string | null;
+  confidence?: number;
 };
 
 type AnalysisType = 'disease' | 'soil' | 'pesticide';
@@ -177,6 +179,7 @@ const DiseaseDetectionCard = ({ initialImage = null, initialAnalysisType = 'dise
         recommendations: analysis.recommendations,
         suitableCrops: analysis.suitableCrops,
         imageSrc: imageData,
+        confidenceScore: analysis.confidenceScore,
         nutrients: analysis.nutrients,
         properties: analysis.properties
       });
@@ -205,7 +208,8 @@ const DiseaseDetectionCard = ({ initialImage = null, initialAnalysisType = 'dise
         organicAlternatives: analysis.organicAlternatives,
         preventionTips: analysis.preventionTips,
         severity: analysis.severity,
-        imageSrc: imageData
+        imageSrc: imageData,
+        confidence: 75 // Add a default confidence value
       });
       
       toast({
@@ -343,6 +347,27 @@ const DiseaseDetectionCard = ({ initialImage = null, initialAnalysisType = 'dise
       );
     };
     
+    // Function to determine if confidence is low
+    const hasLowConfidence = (): boolean => {
+      return detectionResult.confidence < 65;
+    };
+    
+    // Function to get confidence level text
+    const getConfidenceText = (): string => {
+      if (detectionResult.confidence < 50) return t('diseaseAnalysis.veryLowConfidence');
+      if (detectionResult.confidence < 65) return t('diseaseAnalysis.lowConfidence'); 
+      if (detectionResult.confidence < 85) return t('diseaseAnalysis.moderateConfidence');
+      return t('diseaseAnalysis.highConfidence');
+    };
+    
+    // Function to get confidence level color
+    const getConfidenceColor = (): string => {
+      if (detectionResult.confidence < 50) return 'text-red-600';
+      if (detectionResult.confidence < 65) return 'text-orange-600';
+      if (detectionResult.confidence < 85) return 'text-yellow-600';
+      return 'text-green-600';
+    };
+    
     return (
       <div className="space-y-6">
         {/* Disease header with confidence indicator */}
@@ -364,17 +389,22 @@ const DiseaseDetectionCard = ({ initialImage = null, initialAnalysisType = 'dise
               
               <div className="flex flex-wrap gap-2 items-center mb-2">
                 {getSeverityIndicator(detectionResult.severity)}
-                <div className="px-2 py-0.5 bg-blue-50 text-blue-700 text-xs font-medium rounded-full">
-                  {detectionResult.confidence}% Confidence
+                <div className="flex items-center gap-1">
+                  <div className="px-2 py-0.5 bg-blue-50 text-blue-700 text-xs font-medium rounded-full">
+                    {detectionResult.confidence}% Confidence
+                  </div>
+                  <span className={`text-xs font-medium ${getConfidenceColor()}`}>
+                    ({getConfidenceText()})
+                  </span>
                 </div>
               </div>
               
-              <div className="w-full bg-gray-200 rounded-full h-2 mb-1">
+              <div className="w-full bg-gray-200 rounded-full h-2.5 mb-1">
                 <div 
                   className={`h-full rounded-full ${
-                    detectionResult.confidence > 80 ? 'bg-green-500' : 
-                    detectionResult.confidence > 60 ? 'bg-lime-500' : 
-                    detectionResult.confidence > 40 ? 'bg-yellow-500' : 
+                    detectionResult.confidence > 85 ? 'bg-green-500' : 
+                    detectionResult.confidence > 70 ? 'bg-lime-500' : 
+                    detectionResult.confidence > 55 ? 'bg-yellow-500' : 
                     'bg-orange-500'
                   }`}
                   style={{ width: `${detectionResult.confidence}%` }}
@@ -383,6 +413,19 @@ const DiseaseDetectionCard = ({ initialImage = null, initialAnalysisType = 'dise
             </div>
           </div>
         </div>
+        
+        {/* Warning for low confidence results */}
+        {hasLowConfidence() && (
+          <div className="bg-yellow-50 rounded-lg p-3 border border-yellow-200">
+            <div className="flex items-start">
+              <AlertTriangle className="h-4 w-4 text-yellow-500 mr-2 mt-0.5" />
+              <div>
+                <h5 className="text-sm font-medium text-yellow-700">{t('diseaseAnalysis.limitedConfidence')}</h5>
+                <p className="text-xs text-yellow-600">{t('diseaseAnalysis.considerConsultingExpert')}</p>
+              </div>
+            </div>
+          </div>
+        )}
         
         {/* Treatment and details section */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -440,13 +483,12 @@ const DiseaseDetectionCard = ({ initialImage = null, initialAnalysisType = 'dise
   const renderSoilResult = () => {
     if (!soilResult) return null;
     
-    // Helper function to get color for nutrient levels
+    // Helper function to get color for nutrient bars
     const getNutrientColor = (value: number) => {
-      if (value < 20) return "bg-red-500";
-      if (value < 40) return "bg-orange-500";
-      if (value < 60) return "bg-yellow-500";
-      if (value < 80) return "bg-lime-500";
-      return "bg-green-500";
+      if (value < 10) return 'bg-red-400';
+      if (value < 25) return 'bg-orange-400';
+      if (value < 50) return 'bg-yellow-400';
+      return 'bg-green-500';
     };
     
     // Helper function to get soil texture icon
@@ -477,6 +519,33 @@ const DiseaseDetectionCard = ({ initialImage = null, initialAnalysisType = 'dise
                    </div>
                  </div>;
       }
+    };
+    
+    // Helper function to get confidence level display
+    const getConfidenceDisplay = (): string => {
+      if (soilResult.confidenceScore === undefined) return '';
+      
+      if (soilResult.confidenceScore <= 3) return t('soilAnalysis.lowConfidence');
+      if (soilResult.confidenceScore <= 7) return t('soilAnalysis.moderateConfidence');
+      return t('soilAnalysis.highConfidence');
+    };
+    
+    // Helper function to get confidence color
+    const getConfidenceColor = (): string => {
+      if (soilResult.confidenceScore === undefined) return 'text-gray-500';
+      
+      if (soilResult.confidenceScore <= 3) return 'text-red-500';
+      if (soilResult.confidenceScore <= 7) return 'text-yellow-500';
+      return 'text-green-500';
+    };
+    
+    // Check if analysis has low confidence
+    const hasLowConfidence = (): boolean => {
+      if (soilResult.confidenceScore !== undefined) {
+        return soilResult.confidenceScore < 5;
+      }
+      
+      return soilResult.soilType.toLowerCase().includes('low confidence');
     };
     
     // Check if soil type is undetermined
@@ -511,6 +580,17 @@ const DiseaseDetectionCard = ({ initialImage = null, initialAnalysisType = 'dise
                     pH {soilResult.phLevel}
                   </div>
                 </div>
+                
+                {/* Add confidence level display */}
+                {soilResult.confidenceScore !== undefined && (
+                  <div className="flex items-center mt-1">
+                    <span className="text-xs text-gray-500 mr-1">{t('soilAnalysis.confidence')}:</span>
+                    <span className={`text-xs font-medium ${getConfidenceColor()}`}>
+                      {getConfidenceDisplay()}
+                    </span>
+                  </div>
+                )}
+                
                 {isUndetermined && (
                   <p className="mt-2 text-sm text-blue-700">
                     <span className="inline-flex items-center">
@@ -523,6 +603,19 @@ const DiseaseDetectionCard = ({ initialImage = null, initialAnalysisType = 'dise
                 )}
               </div>
             </div>
+            
+            {/* Low confidence warning */}
+            {hasLowConfidence() && (
+              <div className="mb-4 bg-yellow-50 rounded-lg p-3 border border-yellow-200">
+                <div className="flex items-start">
+                  <AlertTriangle className="h-4 w-4 text-yellow-500 mr-2 mt-0.5" />
+                  <div>
+                    <h5 className="text-sm font-medium text-yellow-700">{t('soilAnalysis.limitedConfidence')}</h5>
+                    <p className="text-xs text-yellow-600">{t('soilAnalysis.labTestingRecommended')}</p>
+                  </div>
+                </div>
+              </div>
+            )}
             
             {/* Nutrient gauge chart - visible only if nutrients data exists */}
             {soilResult.nutrients && (
@@ -715,6 +808,19 @@ const DiseaseDetectionCard = ({ initialImage = null, initialAnalysisType = 'dise
         </div>
       );
     };
+
+    // Function to get confidence display
+    const getConfidenceText = (): string => {
+      const confidence = pesticideResult.confidence || 75;
+      if (confidence < 60) return t('pestAnalysis.lowConfidence');
+      if (confidence < 80) return t('pestAnalysis.moderateConfidence');
+      return t('pestAnalysis.highConfidence');
+    };
+    
+    // Function to determine if confidence is low
+    const hasLowConfidence = (): boolean => {
+      return (pesticideResult.confidence || 75) < 65;
+    };
     
     return (
       <div className="space-y-4">
@@ -733,9 +839,28 @@ const DiseaseDetectionCard = ({ initialImage = null, initialAnalysisType = 'dise
               </div>
               <div>
                 <h3 className="font-semibold text-lg text-slate-800">{pesticideResult.pestType}</h3>
-                {getSeverityBadge(pesticideResult.severity)}
+                <div className="flex flex-wrap gap-2 mt-1">
+                  {getSeverityBadge(pesticideResult.severity)}
+                  {pesticideResult.confidence && (
+                    <div className="inline-flex items-center px-3 py-1 rounded-full bg-blue-50 text-blue-700 text-xs font-medium border border-blue-100">
+                      {getConfidenceText()}
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
+
+            {/* Add a warning for low confidence results */}
+            {hasLowConfidence() && (
+              <div className="mb-4 p-2 bg-yellow-50 rounded border border-yellow-200">
+                <div className="flex items-start">
+                  <AlertTriangle className="h-4 w-4 text-yellow-500 mr-2 mt-0.5" />
+                  <div>
+                    <p className="text-xs text-yellow-700">{t('pestAnalysis.considerConsultingExpert')}</p>
+                  </div>
+                </div>
+              </div>
+            )}
             
             <div className="mt-4 flex items-center">
               <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden">

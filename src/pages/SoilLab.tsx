@@ -37,6 +37,7 @@ type SoilAnalysisResult = {
   soilPresent: boolean;
   nutrients: SoilNutrients;
   properties: SoilProperties;
+  confidenceScore?: number;
 };
 
 const SoilLab = () => {
@@ -105,7 +106,8 @@ const SoilLab = () => {
               texture: analysis.properties?.texture || 'Loamy',
               waterRetention: analysis.properties?.waterRetention || 65,
               drainage: analysis.properties?.drainage || 'Good'
-            }
+            },
+            confidenceScore: analysis.confidenceScore
           });
           
           toast({
@@ -241,6 +243,43 @@ const SoilLab = () => {
     }
   };
 
+  const hasLowConfidence = (result: SoilAnalysisResult | null): boolean => {
+    if (!result) return false;
+    
+    if (result.confidenceScore !== undefined) {
+      return result.confidenceScore < 5;
+    }
+    
+    return result.soilType.toLowerCase().includes('low confidence');
+  };
+
+  const getConfidenceDisplay = (result: SoilAnalysisResult | null): string => {
+    if (!result) return '';
+    
+    if (result.confidenceScore !== undefined) {
+      if (result.confidenceScore <= 3) return t('soilLab.lowConfidence');
+      if (result.confidenceScore <= 7) return t('soilLab.moderateConfidence');
+      return t('soilLab.highConfidence');
+    }
+    
+    if (result.soilType.toLowerCase().includes('low confidence')) {
+      return t('soilLab.lowConfidence');
+    } else if (result.soilType.toLowerCase().includes('high confidence')) {
+      return t('soilLab.highConfidence');
+    }
+    
+    return t('soilLab.moderateConfidence');
+  };
+
+  const getConfidenceColor = (result: SoilAnalysisResult | null): string => {
+    if (!result) return 'text-gray-500';
+    
+    const level = getConfidenceDisplay(result);
+    if (level === t('soilLab.lowConfidence')) return 'text-red-500';
+    if (level === t('soilLab.moderateConfidence')) return 'text-yellow-500';
+    return 'text-green-500';
+  };
+
   const renderUploadSection = () => {
     return (
       <div className="flex flex-col items-center justify-center p-8 border-2 border-dashed border-gray-300 rounded-lg bg-gray-50">
@@ -307,6 +346,12 @@ const SoilLab = () => {
               <span className="text-sm text-gray-500 mr-2">{t('phLevel')}:</span>
               <span className="font-medium">{analysisResult.phLevel}</span>
             </div>
+            <div className="mt-1 flex items-center">
+              <span className="text-sm text-gray-500 mr-2">{t('soilLab.analysisConfidence')}:</span>
+              <span className={`font-medium ${getConfidenceColor(analysisResult)}`}>
+                {getConfidenceDisplay(analysisResult)}
+              </span>
+            </div>
           </div>
           
           <div>
@@ -328,6 +373,18 @@ const SoilLab = () => {
               ))}
             </div>
           </div>
+
+          {hasLowConfidence(analysisResult) && (
+            <Alert variant="default" className="mt-4">
+              <AlertTitle className="flex items-center">
+                <Info className="mr-2 h-4 w-4" />
+                {t('soilLab.limitedConfidence')}
+              </AlertTitle>
+              <AlertDescription>
+                {t('soilLab.labTestingRecommended')}
+              </AlertDescription>
+            </Alert>
+          )}
           
           <div className="flex space-x-3 mt-4">
             <Button 
@@ -659,6 +716,16 @@ const SoilLab = () => {
                           ))}
                         </ul>
                       </div>
+                      
+                      {hasLowConfidence(analysisResult) && (
+                        <Alert variant="default" className="mb-4">
+                          <Info className="h-4 w-4" />
+                          <AlertTitle>{t('soilLab.disclaimer')}</AlertTitle>
+                          <AlertDescription>
+                            {t('soilLab.visualAnalysisLimitation')}
+                          </AlertDescription>
+                        </Alert>
+                      )}
                       
                       <div className="bg-agri-amber/10 p-4 rounded-md mb-4">
                         <h4 className="font-medium flex items-center text-agri-darkGreen mb-2">

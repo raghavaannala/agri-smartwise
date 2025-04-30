@@ -406,6 +406,7 @@ export const analyzeSoil = async (imageData: string): Promise<{
   recommendations: string;
   suitableCrops: string[];
   soilPresent: boolean;
+  confidenceScore?: number;
   nutrients?: {
     nitrogen: number;
     phosphorus: number;
@@ -429,21 +430,26 @@ export const analyzeSoil = async (imageData: string): Promise<{
   
   try {
     const prompt = `
-      Analyze this soil image and provide detailed soil analysis information. 
+      Analyze this soil image and provide detailed, scientifically accurate soil analysis information. 
       If no soil is visible, indicate that no soil is present.
       
-      Even if you can't determine the exact soil classification, provide the most likely soil category based on visual characteristics.
-      Never return "Unable to determine" as the soilType - instead provide the closest match like "Likely Loamy Mix" or 
-      "Mixed Soil (Sandy/Clay)" or describe it like "Dark Organic-Rich Soil" or "Agricultural Topsoil".
+      Important: Be accurate and scientific in your assessment. If you cannot determine certain properties with reasonable confidence, use the most likely estimate but add a confidence level.
+      
+      Focus on these visual indicators for your analysis:
+      - Color (dark = high organic, red = iron-rich, etc.)
+      - Texture (visible particles, clumping behavior)
+      - Moisture level
+      - Any visible organic matter, roots, or debris
       
       Return the analysis as valid JSON with the following structure:
       {
         "soilPresent": boolean,
-        "soilType": "Clay/Sandy/Loamy/Silty/Mixed/etc. with descriptive adjectives",
-        "fertility": "Low/Medium/High",
-        "phLevel": "Acidic/Neutral/Alkaline (approximate pH value)",
-        "recommendations": "Detailed recommendations for improving soil health",
+        "soilType": "Specific soil classification with confidence level (e.g., 'Clay Loam (High confidence)' or 'Sandy Soil (Medium confidence)')",
+        "fertility": "Low/Medium/High (based on color, organic content, texture)",
+        "phLevel": "Approximate pH with range (e.g., '6.5-7.0 (Neutral)')",
+        "recommendations": "Detailed, science-based recommendations for improving this specific soil",
         "suitableCrops": ["crop1", "crop2", "crop3"],
+        "confidenceScore": number (1-10 scale of overall confidence in analysis),
         "nutrients": {
           "nitrogen": number (percentage between 0-100),
           "phosphorus": number (percentage between 0-100),
@@ -453,13 +459,13 @@ export const analyzeSoil = async (imageData: string): Promise<{
         },
         "properties": {
           "ph": number (between 0-14),
-          "texture": "Description of soil texture",
+          "texture": "Specific soil texture classification (Sand, Silt, Clay, Loam, Sandy Loam, etc.)",
           "waterRetention": number (percentage between 0-100),
           "drainage": "Good/Moderate/Poor"
         }
       }
       
-      For fields that cannot be determined from the image, provide the most reasonable estimate based on the visible soil properties.
+      For fields that cannot be determined with high confidence, provide your best estimate followed by confidence level.
       Make sure the JSON is valid and all numbers are actual numbers, not strings.
     `;
 
@@ -467,7 +473,18 @@ export const analyzeSoil = async (imageData: string): Promise<{
     
     // Parse the JSON response or handle if it's not valid JSON
     try {
-      const analysis = JSON.parse(result);
+      let analysis;
+      // Extract JSON if it's wrapped in markdown code blocks
+      if (result.includes('```json')) {
+        const jsonMatch = result.match(/```json\n([\s\S]*?)\n```/);
+        if (jsonMatch && jsonMatch[1]) {
+          analysis = JSON.parse(jsonMatch[1]);
+        } else {
+          throw new Error('Could not extract JSON from response');
+        }
+      } else {
+        analysis = JSON.parse(result);
+      }
       
       // If no soil is present, return a default response
       if (!analysis.soilPresent) {
@@ -478,6 +495,7 @@ export const analyzeSoil = async (imageData: string): Promise<{
           recommendations: 'No soil detected in the image. Please upload a clear image of soil for analysis.',
           suitableCrops: [],
           soilPresent: false,
+          confidenceScore: 3,
           nutrients: {
             nitrogen: 0,
             phosphorus: 0,
@@ -494,7 +512,33 @@ export const analyzeSoil = async (imageData: string): Promise<{
         };
       }
       
-      // Check for problematic soil type values and replace them
+      // Check for confidence score to determine accuracy
+      const confidenceScore = analysis.confidenceScore || 5;
+      const lowConfidence = confidenceScore < 5;
+      
+      // Set fertility with more precise analysis
+      let fertility: 'Low' | 'Medium' | 'High' = 'Medium';
+      if (analysis.fertility) {
+        if (typeof analysis.fertility === 'string') {
+          if (analysis.fertility.toLowerCase().includes('low')) {
+            fertility = 'Low';
+          } else if (analysis.fertility.toLowerCase().includes('high')) {
+            fertility = 'High';
+          } else {
+            fertility = 'Medium';
+          }
+        }
+      } else {
+        // Determine fertility based on organic matter if available
+        if (analysis.nutrients?.organicMatter) {
+          const organicMatter = Number(analysis.nutrients.organicMatter);
+          if (organicMatter < 20) fertility = 'Low';
+          else if (organicMatter > 50) fertility = 'High';
+          else fertility = 'Medium';
+        }
+      }
+      
+      // Process soil type to maintain clarity and accuracy
       let soilType = analysis.soilType || '';
       if (soilType.toLowerCase().includes('unable to determine') || 
           soilType.toLowerCase().includes('unknown') || 
@@ -506,7 +550,48 @@ export const analyzeSoil = async (imageData: string): Promise<{
           soilType = `${analysis.properties.texture} Soil`;
         } else {
           // Fallback to a general description based on color or other characteristics
-          soilType = 'Agricultural Soil';
+          soilType = 'Agricultural Soil (Low confidence)';
+        }
+      }
+      
+      // Add disclaimer for low confidence
+      if (lowConfidence && !soilType.toLowerCase().includes('confidence')) {
+        soilType += ' (Low confidence)';
+      }
+      
+      // Process and normalize pH level
+      let phLevel = analysis.phLevel || 'Neutral';
+      if (!phLevel.toLowerCase().includes('acidic') && !phLevel.toLowerCase().includes('alkaline') && !phLevel.toLowerCase().includes('neutral')) {
+        const phValue = analysis.properties?.ph || 7;
+        if (phValue < 6) phLevel = `${phValue} (Acidic)`;
+        else if (phValue > 7.5) phLevel = `${phValue} (Alkaline)`;
+        else phLevel = `${phValue} (Neutral)`;
+      }
+      
+      // Build better recommendations based on soil type and nutrients
+      let recommendations = analysis.recommendations;
+      if (!recommendations || recommendations.trim() === '') {
+        recommendations = 'Based on the analysis:';
+        
+        if (fertility === 'Low') {
+          recommendations += ' Add organic compost to improve soil fertility.';
+        }
+        
+        if (analysis.properties?.ph) {
+          const ph = Number(analysis.properties.ph);
+          if (ph < 6) {
+            recommendations += ' Add agricultural lime to reduce soil acidity.';
+          } else if (ph > 7.5) {
+            recommendations += ' Add sulfur or organic matter to reduce alkalinity.';
+          }
+        }
+        
+        if (analysis.nutrients?.nitrogen && Number(analysis.nutrients.nitrogen) < 30) {
+          recommendations += ' Consider nitrogen-rich fertilizers or growing legumes.';
+        }
+        
+        if (analysis.properties?.drainage === 'Poor') {
+          recommendations += ' Improve drainage with sand or raised beds.';
         }
       }
       
@@ -518,6 +603,7 @@ export const analyzeSoil = async (imageData: string): Promise<{
         recommendations: string;
         suitableCrops: string[];
         soilPresent: boolean;
+        confidenceScore?: number;
         nutrients?: {
           nitrogen: number;
           phosphorus: number;
@@ -533,29 +619,31 @@ export const analyzeSoil = async (imageData: string): Promise<{
         };
       } = {
         soilType: soilType,
-        fertility: (analysis.fertility || 'Medium') as 'Low' | 'Medium' | 'High',
-        phLevel: analysis.phLevel || 'Neutral',
-        recommendations: analysis.recommendations || 'General recommendation: Add organic matter to improve soil health.',
+        fertility: fertility,
+        phLevel: phLevel,
+        recommendations: recommendations,
         suitableCrops: analysis.suitableCrops || ['Beans', 'Potatoes', 'Corn'],
-        soilPresent: true
+        soilPresent: true,
+        confidenceScore: confidenceScore
       };
       
-      // Add nutrients and properties if they exist
+      // Add nutrients with more careful validation
       if (analysis.nutrients) {
         soilAnalysis.nutrients = {
-          nitrogen: parseFloat(analysis.nutrients.nitrogen) || 20,
-          phosphorus: parseFloat(analysis.nutrients.phosphorus) || 15,
-          potassium: parseFloat(analysis.nutrients.potassium) || 18,
-          organicMatter: parseFloat(analysis.nutrients.organicMatter) || 5,
-          sulfur: parseFloat(analysis.nutrients.sulfur) || 10,
+          nitrogen: ensureValidPercentage(analysis.nutrients.nitrogen) || 20,
+          phosphorus: ensureValidPercentage(analysis.nutrients.phosphorus) || 15,
+          potassium: ensureValidPercentage(analysis.nutrients.potassium) || 18,
+          organicMatter: ensureValidPercentage(analysis.nutrients.organicMatter) || 5,
+          sulfur: ensureValidPercentage(analysis.nutrients.sulfur) || 10,
         };
       }
       
+      // Add properties with more careful validation
       if (analysis.properties) {
         soilAnalysis.properties = {
-          ph: parseFloat(analysis.properties.ph) || 7,
+          ph: ensureValidPH(analysis.properties.ph) || 7,
           texture: analysis.properties.texture || 'Medium',
-          waterRetention: parseFloat(analysis.properties.waterRetention) || 50,
+          waterRetention: ensureValidPercentage(analysis.properties.waterRetention) || 50,
           drainage: analysis.properties.drainage || 'Moderate'
         };
       }
@@ -568,12 +656,13 @@ export const analyzeSoil = async (imageData: string): Promise<{
       
       // Return a fallback response with a more descriptive soil type
       return {
-        soilType: 'Agricultural Soil',
+        soilType: 'Agricultural Soil (Low confidence)',
         fertility: 'Medium',
-        phLevel: 'Neutral',
-        recommendations: 'Based on the nutrients analysis, this appears to be average agricultural soil. Consider adding organic matter to improve overall health and structure.',
+        phLevel: 'Neutral (estimated)',
+        recommendations: 'Based on limited analysis, this appears to be average agricultural soil. Consider soil testing for more accurate results. Add organic matter to improve overall health and structure.',
         suitableCrops: ['Beans', 'Potatoes', 'Corn'],
         soilPresent: true,
+        confidenceScore: 3,
         nutrients: {
           nitrogen: 20,
           phosphorus: 15,
@@ -594,6 +683,20 @@ export const analyzeSoil = async (imageData: string): Promise<{
     throw error;
   }
 };
+
+// Helper function to ensure valid percentage values
+function ensureValidPercentage(value: any): number {
+  const num = parseFloat(value);
+  if (isNaN(num)) return 0;
+  return Math.max(0, Math.min(100, num));
+}
+
+// Helper function to ensure valid pH values
+function ensureValidPH(value: any): number {
+  const num = parseFloat(value);
+  if (isNaN(num)) return 7;
+  return Math.max(0, Math.min(14, num));
+}
 
 /**
  * Analyze an image for pest detection and recommendations
