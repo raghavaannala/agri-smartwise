@@ -6,12 +6,15 @@ import { toast } from 'sonner';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Loader, MapPin, Calendar, HelpCircle, RefreshCw, WifiOff, AlertCircle, Pencil, Info } from 'lucide-react';
+import { Loader, MapPin, Calendar, HelpCircle, RefreshCw, WifiOff, AlertCircle, Pencil, Info, LineChart } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import SatelliteMap from '@/components/agrovision/SatelliteMap';
 import NDVIAnalytics from '@/components/agrovision/NDVIAnalytics';
 import { FarmNdviData, getFarmNdviData, getNdviDataForDate } from '@/services/ndviService';
 import { useTranslation } from 'react-i18next';
+import { useUserFarms } from '../../app/hooks/useUserFarms';
+import { Badge } from '@/components/ui/badge';
+import { format } from 'date-fns';
 
 interface Farm {
   id: string;
@@ -20,9 +23,20 @@ interface Farm {
   // Add other farm fields as needed
 }
 
+// Add type for CustomArea
+interface CustomArea {
+  id: string;
+  name: string;
+  polygon: [number, number][];
+  ndviValue: number | null;
+  isAnalyzing: boolean;
+  area?: number; // Area in acres
+}
+
 const AgroVision = () => {
   const { t } = useTranslation();
   const { currentUser } = useAuth();
+  const { farms, isLoading: isLoadingFarms } = useUserFarms();
   const [userFarms, setUserFarms] = useState<Farm[]>([]);
   const [selectedFarm, setSelectedFarm] = useState<Farm | null>(null);
   const [selectedDate, setSelectedDate] = useState(new Date());
@@ -35,6 +49,10 @@ const AgroVision = () => {
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [autoRefresh, setAutoRefresh] = useState<boolean>(false);
   const [refreshInterval, setRefreshInterval] = useState<number>(300000); // 5 minutes default
+  // Add state for custom areas
+  const [customAreas, setCustomAreas] = useState<CustomArea[]>([]);
+  const [selectedCustomAreaId, setSelectedCustomAreaId] = useState<string | null>(null);
+  const [hasPendingArea, setHasPendingArea] = useState(false);
   
   // Load user farms on component mount
   useEffect(() => {
@@ -182,6 +200,53 @@ const AgroVision = () => {
     return `${diffDays} days ago`;
   };
   
+  // Update the onCustomAreaUpdate function to track pending areas
+  const handleCustomAreaUpdate = (areas, selectedId, hasPending = false) => {
+    console.log("handleCustomAreaUpdate called:", { areas, selectedId, hasPending });
+    setCustomAreas(areas);
+    setSelectedCustomAreaId(selectedId);
+    setHasPendingArea(hasPending);
+    
+    // Don't automatically switch tabs - let user explore the map first
+  };
+  
+  // Add useEffect to monitor state for debugging
+  useEffect(() => {
+    if (customAreas.length > 0) {
+      console.log("Custom areas exist:", customAreas);
+      const analyzed = customAreas.filter(area => !area.isAnalyzing && area.ndviValue !== null);
+      console.log("Analyzed areas:", analyzed);
+      
+      if (analyzed.length > 0 && activeTab === 'map') {
+        console.log("Have analyzed areas but still on map tab");
+      }
+    }
+  }, [customAreas, activeTab]);
+  
+  // Add a simple debug function to force tab switch
+  const forceAnalyticsTab = () => {
+    console.log("Forcing switch to analytics tab");
+    setActiveTab('analytics');
+  };
+  
+  // Add event listener for the 'showAnalytics' event from SatelliteMap
+  useEffect(() => {
+    const handleShowAnalytics = (event: Event) => {
+      const customEvent = event as CustomEvent;
+      const areaId = customEvent.detail?.areaId;
+      console.log("Received showAnalytics event for area:", areaId);
+      
+      // Switch to analytics tab
+      setActiveTab('analytics');
+    };
+    
+    window.addEventListener('showAnalytics', handleShowAnalytics);
+    
+    return () => {
+      window.removeEventListener('showAnalytics', handleShowAnalytics);
+    };
+  }, []);
+  
   return (
     <MainLayout>
       <div className="container mx-auto py-6">
@@ -217,6 +282,19 @@ const AgroVision = () => {
               <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? "animate-spin" : ""}`} />
               {t('common.forceRefresh', 'Force Refresh')}
             </Button>
+            
+            {/* Debug button */}
+            {customAreas.length > 0 && (
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={forceAnalyticsTab}
+                className="bg-blue-50 text-blue-600"
+              >
+                <LineChart className="h-4 w-4 mr-2" />
+                View Analytics
+              </Button>
+            )}
             
             <Button 
               variant="outline" 
@@ -266,39 +344,7 @@ const AgroVision = () => {
           </div>
         )}
         
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 mb-6">
-          <Card className="p-4">
-            <h3 className="font-medium mb-3">{t('agroVision.selectFarm', 'Select Farm')}</h3>
-            <Select 
-              disabled={userFarms.length === 0 || isLoading} 
-              value={selectedFarm?.id || ''} 
-              onValueChange={(value) => {
-                const farm = userFarms.find(f => f.id === value);
-                if (farm) {
-                  setSelectedFarm(farm);
-                  setSelectedFieldId(null);
-                }
-              }}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder={t('agroVision.selectFarmPlaceholder', 'Select a farm')} />
-              </SelectTrigger>
-              <SelectContent>
-                {userFarms.map((farm) => (
-                  <SelectItem key={farm.id} value={farm.id}>
-                    {farm.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            
-            {userFarms.length === 0 && !isLoading && (
-              <p className="text-sm text-amber-600 mt-2">
-                {t('agroVision.noFarmsWarning', 'You need to create a farm first.')}
-              </p>
-            )}
-          </Card>
-          
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
           <Card className="p-4">
             <h3 className="font-medium mb-3">{t('agroVision.selectDate', 'Select Date')}</h3>
             <input
@@ -319,13 +365,9 @@ const AgroVision = () => {
                     <Loader className="h-4 w-4 mr-2 animate-spin" />
                     {t('agroVision.loadingData', 'Loading data...')}
                   </div>
-                ) : selectedFarm ? (
-                  <div className="text-green-600">
-                    {t('agroVision.readyToAnalyze', 'Ready to analyze')} {selectedFarm.name}
-                  </div>
                 ) : (
-                  <div className="text-slate-500">
-                    {t('agroVision.selectFarmToBegin', 'Select a farm to begin')}
+                  <div className="text-green-600">
+                    {t('agroVision.readyToAnalyze', 'Ready to analyze custom areas')}
                   </div>
                 )}
                 
@@ -350,6 +392,14 @@ const AgroVision = () => {
                   </div>
                 </div>
               )}
+              
+              {customAreas.length > 0 && (
+                <div className="flex items-center">
+                  <div className="text-sm bg-blue-50 text-blue-700 px-3 py-1 rounded-md border border-blue-200">
+                    {t('agroVision.customAreasDrawn', 'Custom Areas')}: {customAreas.length}
+                  </div>
+                </div>
+              )}
             </div>
           </Card>
         </div>
@@ -366,20 +416,68 @@ const AgroVision = () => {
             </TabsTrigger>
           </TabsList>
           
-          <TabsContent value="map" className="mt-4">
+          {/* Add Draw Custom Area button here when map tab is active */}
+          {activeTab === 'map' && mapInitialized && !isLoading && (
+            <div className="flex justify-end mb-4">
+              <Button
+                variant="default"
+                size="lg"
+                className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-medium px-5 py-3"
+                onClick={() => {
+                  if (window.startDrawingPolygon) {
+                    window.startDrawingPolygon();
+                  }
+                }}
+              >
+                <Pencil className="h-5 w-5" />
+                <span className="text-base font-bold">Draw Custom Area</span>
+              </Button>
+            </div>
+          )}
+          
+          <TabsContent value="map" className="mt-4 relative">
             <SatelliteMap 
               ndviData={ndviData}
               isLoading={isLoading}
               onInitialize={handleInitializeMap}
               onFieldSelect={handleFieldSelect}
               selectedFieldId={selectedFieldId}
+              onCustomAreaUpdate={handleCustomAreaUpdate}
             />
+            
+            {/* Add direct overlay analyze button */}
+            {hasPendingArea && (
+              <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-[9999]">
+                <Button
+                  size="lg"
+                  className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white font-medium px-5 py-5 rounded-md shadow-xl border-2 border-white animate-pulse"
+                  onClick={() => {
+                    console.log("Center Analyze Area button clicked");
+                    if (window.analyzeDrawnArea) {
+                      console.log("Calling window.analyzeDrawnArea()");
+                      window.analyzeDrawnArea();
+                      // Don't switch tabs automatically - user should first see analysis on the map
+                    } else {
+                      toast.error("Analysis tool not available", { 
+                        description: "Please refresh the page and try again."
+                      });
+                    }
+                  }}
+                >
+                  <LineChart className="h-6 w-6" />
+                  <span className="text-lg font-bold">Analyze Selected Area</span>
+                </Button>
+              </div>
+            )}
           </TabsContent>
           
           <TabsContent value="analytics">
             <NDVIAnalytics 
               ndviData={ndviData}
               isLoading={isLoading}
+              selectedFieldId={selectedFieldId}
+              customAreas={customAreas}
+              selectedCustomAreaId={selectedCustomAreaId}
             />
           </TabsContent>
         </Tabs>
@@ -451,6 +549,65 @@ const AgroVision = () => {
             </div>
           </div>
         </Card>
+
+        {/* Update the fixed floating buttons section with a permanently visible analyze button */}
+        <div className="fixed bottom-8 right-8 z-[9999] flex flex-col gap-3">
+          <Button
+            size="lg"
+            className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white font-medium px-5 py-6 rounded-full shadow-lg"
+            onClick={() => {
+              console.log("Fixed Analyze button clicked");
+              // Force analyze regardless of pending state
+              if (window.analyzeDrawnArea) {
+                console.log("Calling window.analyzeDrawnArea() from fixed button");
+                window.analyzeDrawnArea();
+                // Don't switch tabs automatically - user should first see analysis on the map
+              } else {
+                toast.error("Analysis tool not available", { 
+                  description: "Please refresh the page and try again."
+                });
+              }
+            }}
+          >
+            <LineChart className="h-6 w-6" />
+            <span className="text-lg font-bold">Analyze Area</span>
+          </Button>
+          
+          <Button
+            size="lg"
+            className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-medium px-5 py-6 rounded-full shadow-lg"
+            onClick={() => {
+              console.log("Fixed Analyze button clicked");
+              // First ensure the map tab is active
+              setActiveTab('map');
+              
+              // Then try to start drawing after a small delay
+              setTimeout(() => {
+                // Get the SatelliteMap component's startDrawing function
+                const mapElement = document.querySelector('.leaflet-container');
+                if (mapElement && window.startDrawingPolygon) {
+                  try {
+                    console.log("Calling window.startDrawingPolygon()");
+                    window.startDrawingPolygon();
+                    console.log('Drawing mode activated');
+                  } catch (error) {
+                    console.error('Error starting drawing:', error);
+                    toast.error("Could not start drawing", { 
+                      description: "There was an error initializing the drawing tool."
+                    });
+                  }
+                } else {
+                  toast.error("Drawing tool not available", { 
+                    description: "Please make sure the map is fully loaded and try again."
+                  });
+                }
+              }, 500);
+            }}
+          >
+            <Pencil className="h-6 w-6" />
+            <span className="text-lg font-bold">Draw Area</span>
+          </Button>
+        </div>
       </div>
     </MainLayout>
   );
