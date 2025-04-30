@@ -28,6 +28,7 @@ type SoilAnalysisResult = {
     phosphorus: number;
     potassium: number;
     organicMatter: number;
+    sulfur: number;
   };
   properties?: {
     ph: number;
@@ -314,67 +315,123 @@ const DiseaseDetectionCard = ({ initialImage = null, initialAnalysisType = 'dise
   const renderDiseaseResult = () => {
     if (!detectionResult) return null;
     
-    return (
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div className="overflow-hidden rounded-lg border border-gray-200">
-          <img 
-            src={detectionResult.imageSrc ?? ''} 
-            alt="Plant image" 
-            className="w-full h-auto"
-          />
+    // Function to get severity color with better contrast
+    const getSeverityIndicator = (severity: string) => {
+      const colors = {
+        'Low': 'bg-emerald-500 border-emerald-600',
+        'Medium': 'bg-amber-500 border-amber-600',
+        'High': 'bg-red-500 border-red-600'
+      };
+      
+      const icons = {
+        'Low': '●',
+        'Medium': '●●',
+        'High': '●●●'
+      };
+      
+      return (
+        <div className="flex items-center gap-2">
+          <div className={`h-3 w-3 rounded-full ${colors[severity as keyof typeof colors]}`}></div>
+          <span className={`text-sm font-medium ${
+            severity === 'Low' ? 'text-emerald-700' : 
+            severity === 'Medium' ? 'text-amber-700' : 
+            'text-red-700'
+          }`}>
+            {severity} Severity
+          </span>
         </div>
-        <div>
-          <div className="flex items-center mb-3">
-            <AlertTriangle className={`h-5 w-5 ${getSeverityColor(detectionResult.severity)} mr-2`} />
-            <h3 className="font-semibold text-lg">{detectionResult.disease}</h3>
-          </div>
-          
-          <div className="space-y-3">
-            <div>
-              <span className="text-sm text-gray-500">{t('diseaseScan.confidence')}</span>
-              <div className="flex items-center">
-                <div className="h-2 bg-gray-200 rounded-full flex-1 mr-2">
-                  <div 
-                    className="h-full bg-agri-green rounded-full" 
-                    style={{ inlineSize: `${detectionResult.confidence}%` }}
-                  ></div>
+      );
+    };
+    
+    return (
+      <div className="space-y-6">
+        {/* Disease header with confidence indicator */}
+        <div className="bg-gradient-to-r from-orange-50 to-red-50 rounded-lg p-4 border border-orange-100">
+          <div className="flex flex-col md:flex-row md:items-center gap-4">
+            <div className="flex-shrink-0 relative overflow-hidden w-full md:w-24 h-24 rounded-lg border border-orange-200">
+              <img 
+                src={detectionResult.imageSrc ?? ''} 
+                alt={detectionResult.disease}
+                className="absolute inset-0 w-full h-full object-cover"
+              />
+            </div>
+            
+            <div className="flex-grow">
+              <div className="flex items-center gap-2 mb-1">
+                <AlertTriangle className={`h-5 w-5 ${getSeverityColor(detectionResult.severity)}`} />
+                <h3 className="font-semibold text-lg text-slate-800">{detectionResult.disease}</h3>
+              </div>
+              
+              <div className="flex flex-wrap gap-2 items-center mb-2">
+                {getSeverityIndicator(detectionResult.severity)}
+                <div className="px-2 py-0.5 bg-blue-50 text-blue-700 text-xs font-medium rounded-full">
+                  {detectionResult.confidence}% Confidence
                 </div>
-                <span className="text-xs font-medium">{detectionResult.confidence}%</span>
+              </div>
+              
+              <div className="w-full bg-gray-200 rounded-full h-2 mb-1">
+                <div 
+                  className={`h-full rounded-full ${
+                    detectionResult.confidence > 80 ? 'bg-green-500' : 
+                    detectionResult.confidence > 60 ? 'bg-lime-500' : 
+                    detectionResult.confidence > 40 ? 'bg-yellow-500' : 
+                    'bg-orange-500'
+                  }`}
+                  style={{ width: `${detectionResult.confidence}%` }}
+                ></div>
               </div>
             </div>
-            
-            <div>
-              <span className="text-sm text-gray-500">{t('diseaseScan.severity')}</span>
-              <div className="flex items-center">
-                <span className={`font-medium ${getSeverityColor(detectionResult.severity)}`}>
-                  {detectionResult.severity}
-                  {detectionResult.severity !== 'Low' ? ' ⚠️' : ''}
-                </span>
+          </div>
+        </div>
+        
+        {/* Treatment and details section */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="bg-white rounded-lg p-4 border border-gray-200 shadow-sm">
+            <h4 className="text-sm font-medium text-slate-700 mb-2 flex items-center">
+              <div className="h-5 w-5 rounded-full bg-green-100 flex items-center justify-center text-green-700 mr-2">
+                <span className="text-xs">1</span>
               </div>
+              Recommended Treatment
+            </h4>
+            <div className="bg-green-50 p-3 rounded-md border border-green-100">
+              <p className="text-sm text-slate-700 whitespace-pre-line max-h-40 overflow-y-auto">{detectionResult.treatment}</p>
             </div>
-            
-            <div>
-              <span className="text-sm text-gray-500">{t('diseaseScan.recommendedTreatment')}</span>
-              <p className="text-sm">{detectionResult.treatment}</p>
-            </div>
-            
-            {detectionResult.details && (
-              <div>
-                <span className="text-sm text-gray-500">{t('diseaseScan.additionalDetails')}</span>
-                <p className="text-sm">{detectionResult.details}</p>
-              </div>
-            )}
           </div>
           
-          <div className="mt-4">
-            <Button 
-              variant="outline" 
-              onClick={() => setDetectionResult(null)}
-              className="w-full"
-            >
-              {t('diseaseScan.scanAnotherImage')}
-            </Button>
+          {detectionResult.details && (
+            <div className="bg-white rounded-lg p-4 border border-gray-200 shadow-sm">
+              <h4 className="text-sm font-medium text-slate-700 mb-2 flex items-center">
+                <div className="h-5 w-5 rounded-full bg-blue-100 flex items-center justify-center text-blue-700 mr-2">
+                  <span className="text-xs">2</span>
+                </div>
+                Disease Details
+              </h4>
+              <div className="bg-blue-50 p-3 rounded-md border border-blue-100">
+                <p className="text-sm text-slate-700 whitespace-pre-line max-h-40 overflow-y-auto">{detectionResult.details}</p>
+              </div>
+            </div>
+          )}
+        </div>
+        
+        {/* Image section */}
+        <div className="bg-white rounded-lg overflow-hidden border border-gray-200 shadow-sm">
+          <div className="aspect-w-16 aspect-h-9 bg-gray-100">
+            <img 
+              src={detectionResult.imageSrc ?? ''} 
+              alt="Full plant image" 
+              className="w-full h-full object-contain"
+            />
           </div>
+        </div>
+        
+        <div className="flex justify-center mt-4">
+          <Button 
+            variant="outline" 
+            onClick={() => setDetectionResult(null)}
+            className="px-6"
+          >
+            {t('diseaseScan.scanAnotherImage')}
+          </Button>
         </div>
       </div>
     );
@@ -383,121 +440,252 @@ const DiseaseDetectionCard = ({ initialImage = null, initialAnalysisType = 'dise
   const renderSoilResult = () => {
     if (!soilResult) return null;
     
+    // Helper function to get color for nutrient levels
+    const getNutrientColor = (value: number) => {
+      if (value < 20) return "bg-red-500";
+      if (value < 40) return "bg-orange-500";
+      if (value < 60) return "bg-yellow-500";
+      if (value < 80) return "bg-lime-500";
+      return "bg-green-500";
+    };
+    
+    // Helper function to get soil texture icon
+    const getSoilTextureIcon = (texture: string) => {
+      switch(texture.toLowerCase()) {
+        case 'sandy':
+          return <div className="h-10 w-10 rounded-full bg-yellow-100 flex items-center justify-center text-yellow-600">
+                   <div className="h-6 w-6 rounded-full border-2 border-yellow-600 flex items-center justify-center">
+                     <div className="h-3 w-3 rounded-full bg-yellow-600"></div>
+                   </div>
+                 </div>;
+        case 'silty':
+          return <div className="h-10 w-10 rounded-full bg-amber-100 flex items-center justify-center text-amber-700">
+                   <div className="h-7 w-7 rounded-md border-2 border-amber-700"></div>
+                 </div>;
+        case 'clay':
+          return <div className="h-10 w-10 rounded-full bg-orange-100 flex items-center justify-center text-orange-800">
+                   <div className="h-6 w-6 bg-orange-800 rounded-full"></div>
+                 </div>;
+        case 'loamy':
+          return <div className="h-10 w-10 rounded-full bg-green-100 flex items-center justify-center text-green-700">
+                   <div className="h-6 w-6 rounded-md border-2 border-dashed border-green-700"></div>
+                 </div>;
+        default:
+          return <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600">
+                   <div className="h-6 w-6 rounded-md border border-dashed border-blue-600 flex items-center justify-center">
+                     <span className="text-xs font-medium">?</span>
+                   </div>
+                 </div>;
+      }
+    };
+    
+    // Check if soil type is undetermined
+    const isUndetermined = soilResult.soilType === 'Unable to determine' || soilResult.soilType === 'Unknown';
+    
     return (
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div className="overflow-hidden rounded-lg border border-gray-200">
-          <img 
-            src={soilResult.imageSrc ?? ''} 
-            alt="Soil image" 
-            className="w-full h-auto"
-          />
-        </div>
-        <div>
-          <div className="flex items-center mb-3">
-            <Droplets className="h-5 w-5 text-agri-blue mr-2" />
-            <h3 className="font-semibold text-lg">{soilResult.soilType}</h3>
+      <div className="space-y-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="overflow-hidden rounded-lg border border-gray-200">
+            <img 
+              src={soilResult.imageSrc ?? ''} 
+              alt="Soil image" 
+              className="w-full h-auto object-cover"
+            />
           </div>
-          
-          <div className="space-y-3">
-            <div>
-              <span className="text-sm text-gray-500">{t('soilAnalysis.fertility')}</span>
-              <div className="flex items-center">
-                <span className={`font-medium ${getFertilityColor(soilResult.fertility)}`}>
-                  {soilResult.fertility}
-                </span>
+          <div className="bg-gradient-to-br from-green-50 to-blue-50 rounded-lg p-4 border border-blue-100">
+            <div className="flex items-center gap-3 mb-4">
+              {soilResult.properties?.texture && getSoilTextureIcon(soilResult.properties.texture)}
+              <div>
+                <h3 className="font-semibold text-lg text-slate-800">
+                  {isUndetermined ? 'Soil Analysis Available' : soilResult.soilType}
+                </h3>
+                <div className="flex items-center gap-2">
+                  <div className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                    soilResult.fertility === 'High' ? 'bg-green-100 text-green-800' :
+                    soilResult.fertility === 'Medium' ? 'bg-yellow-100 text-yellow-800' :
+                    'bg-red-100 text-red-800'
+                  }`}>
+                    {soilResult.fertility} Fertility
+                  </div>
+                  <div className="px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 text-xs font-medium">
+                    pH {soilResult.phLevel}
+                  </div>
+                </div>
+                {isUndetermined && (
+                  <p className="mt-2 text-sm text-blue-700">
+                    <span className="inline-flex items-center">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" viewBox="0 0 20 20" fill="currentColor">
+                        <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2h.01a1 1 0 000-2H9z" clipRule="evenodd" />
+                      </svg>
+                      Nutrient data available without specific soil classification
+                    </span>
+                  </p>
+                )}
               </div>
             </div>
             
-            <div>
-              <span className="text-sm text-gray-500">{t('soilAnalysis.phLevel')}</span>
-              <p className="text-sm font-medium">{soilResult.phLevel}</p>
-            </div>
-            
-            <div>
-              <span className="text-sm text-gray-500">{t('soilAnalysis.recommendations')}</span>
-              <p className="text-sm">{soilResult.recommendations}</p>
-            </div>
-            
-            <div>
-              <span className="text-sm text-gray-500">{t('soilAnalysis.suitableCrops')}</span>
-              <div className="flex flex-wrap gap-1 mt-1">
-                {soilResult.suitableCrops.map((crop, index) => (
-                  <span 
-                    key={index} 
-                    className="px-2 py-1 bg-agri-freshGreen/10 text-agri-freshGreen rounded-full text-xs"
-                  >
-                    {crop}
-                  </span>
-                ))}
-              </div>
-            </div>
-            
+            {/* Nutrient gauge chart - visible only if nutrients data exists */}
             {soilResult.nutrients && (
-              <div>
-                <span className="text-sm text-gray-500">{t('soilAnalysis.nutrients')}</span>
-                <div className="flex flex-wrap gap-1 mt-1">
-                  <span 
-                    className="px-2 py-1 bg-agri-freshGreen/10 text-agri-freshGreen rounded-full text-xs"
-                  >
-                    {t('soilAnalysis.nitrogen')}: {soilResult.nutrients.nitrogen}%
-                  </span>
-                  <span 
-                    className="px-2 py-1 bg-agri-freshGreen/10 text-agri-freshGreen rounded-full text-xs"
-                  >
-                    {t('soilAnalysis.phosphorus')}: {soilResult.nutrients.phosphorus}%
-                  </span>
-                  <span 
-                    className="px-2 py-1 bg-agri-freshGreen/10 text-agri-freshGreen rounded-full text-xs"
-                  >
-                    {t('soilAnalysis.potassium')}: {soilResult.nutrients.potassium}%
-                  </span>
-                  <span 
-                    className="px-2 py-1 bg-agri-freshGreen/10 text-agri-freshGreen rounded-full text-xs"
-                  >
-                    {t('soilAnalysis.organicMatter')}: {soilResult.nutrients.organicMatter}%
-                  </span>
+              <div className="mb-4 bg-white rounded-lg p-3 shadow-sm border border-gray-100">
+                <h4 className="text-sm font-medium text-slate-700 mb-3">Soil Nutrient Profile</h4>
+                <div className="space-y-3">
+                  <div>
+                    <div className="flex justify-between text-xs mb-1">
+                      <span>Nitrogen</span>
+                      <span className="font-medium">{soilResult.nutrients.nitrogen}%</span>
+                    </div>
+                    <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
+                      <div 
+                        className={`h-full ${getNutrientColor(soilResult.nutrients.nitrogen)}`} 
+                        style={{ width: `${Math.min(100, soilResult.nutrients.nitrogen * 3)}%` }}
+                      ></div>
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <div className="flex justify-between text-xs mb-1">
+                      <span>Phosphorus</span>
+                      <span className="font-medium">{soilResult.nutrients.phosphorus}%</span>
+                    </div>
+                    <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
+                      <div 
+                        className={`h-full ${getNutrientColor(soilResult.nutrients.phosphorus)}`} 
+                        style={{ width: `${Math.min(100, soilResult.nutrients.phosphorus * 3)}%` }}
+                      ></div>
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <div className="flex justify-between text-xs mb-1">
+                      <span>Potassium</span>
+                      <span className="font-medium">{soilResult.nutrients.potassium}%</span>
+                    </div>
+                    <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
+                      <div 
+                        className={`h-full ${getNutrientColor(soilResult.nutrients.potassium)}`} 
+                        style={{ width: `${Math.min(100, soilResult.nutrients.potassium * 3)}%` }}
+                      ></div>
+                    </div>
+                  </div>
+                  
+                  {/* Add sulfur content */}
+                  {soilResult.nutrients.sulfur !== undefined && (
+                    <div>
+                      <div className="flex justify-between text-xs mb-1">
+                        <span>Sulfur</span>
+                        <span className="font-medium">{soilResult.nutrients.sulfur}%</span>
+                      </div>
+                      <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
+                        <div 
+                          className={`h-full ${getNutrientColor(soilResult.nutrients.sulfur)}`} 
+                          style={{ width: `${Math.min(100, soilResult.nutrients.sulfur * 3)}%` }}
+                        ></div>
+                      </div>
+                    </div>
+                  )}
+                  
+                  <div>
+                    <div className="flex justify-between text-xs mb-1">
+                      <span>Organic Matter</span>
+                      <span className="font-medium">{soilResult.nutrients.organicMatter}%</span>
+                    </div>
+                    <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
+                      <div 
+                        className={`h-full ${getNutrientColor(soilResult.nutrients.organicMatter)}`} 
+                        style={{ width: `${Math.min(100, soilResult.nutrients.organicMatter * 3)}%` }}
+                      ></div>
+                    </div>
+                  </div>
                 </div>
               </div>
             )}
             
+            {/* Soil properties section */}
             {soilResult.properties && (
-              <div>
-                <span className="text-sm text-gray-500">{t('soilAnalysis.properties')}</span>
-                <div className="flex flex-wrap gap-1 mt-1">
-                  <span 
-                    className="px-2 py-1 bg-agri-freshGreen/10 text-agri-freshGreen rounded-full text-xs"
-                  >
-                    {t('soilAnalysis.ph')}: {soilResult.properties.ph}
-                  </span>
-                  <span 
-                    className="px-2 py-1 bg-agri-freshGreen/10 text-agri-freshGreen rounded-full text-xs"
-                  >
-                    {t('soilAnalysis.texture')}: {soilResult.properties.texture}
-                  </span>
-                  <span 
-                    className="px-2 py-1 bg-agri-freshGreen/10 text-agri-freshGreen rounded-full text-xs"
-                  >
-                    {t('soilAnalysis.waterRetention')}: {soilResult.properties.waterRetention}%
-                  </span>
-                  <span 
-                    className="px-2 py-1 bg-agri-freshGreen/10 text-agri-freshGreen rounded-full text-xs"
-                  >
-                    {t('soilAnalysis.drainage')}: {soilResult.properties.drainage}
-                  </span>
+              <div className="mb-4 bg-white rounded-lg p-3 shadow-sm border border-gray-100">
+                <h4 className="text-sm font-medium text-slate-700 mb-2">Soil Properties</h4>
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="p-2 bg-blue-50 rounded-md">
+                    <span className="block text-xs text-gray-500">pH Level</span>
+                    <div className="flex items-center mt-1">
+                      <span className="font-medium">{soilResult.properties.ph.toFixed(1)}</span>
+                      <div className="ml-2 h-1.5 flex-1 bg-gray-200 rounded-full overflow-hidden">
+                        <div 
+                          className={`h-full ${
+                            soilResult.properties.ph < 6 ? 'bg-orange-500' : 
+                            soilResult.properties.ph > 8 ? 'bg-purple-500' : 'bg-green-500'
+                          }`}
+                          style={{ width: `${Math.min(100, (soilResult.properties.ph / 14) * 100)}%` }}
+                        ></div>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="p-2 bg-green-50 rounded-md">
+                    <span className="block text-xs text-gray-500">Texture</span>
+                    <span className="font-medium">{soilResult.properties.texture}</span>
+                  </div>
+                  
+                  <div className="p-2 bg-blue-50 rounded-md">
+                    <span className="block text-xs text-gray-500">Water Retention</span>
+                    <div className="flex items-center mt-1">
+                      <span className="font-medium">{soilResult.properties.waterRetention}%</span>
+                      <div className="ml-2 h-1.5 flex-1 bg-gray-200 rounded-full overflow-hidden">
+                        <div 
+                          className="h-full bg-blue-500" 
+                          style={{ width: `${soilResult.properties.waterRetention}%` }}
+                        ></div>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="p-2 bg-green-50 rounded-md">
+                    <span className="block text-xs text-gray-500">Drainage</span>
+                    <span className="font-medium">{soilResult.properties.drainage}</span>
+                  </div>
                 </div>
               </div>
             )}
           </div>
-          
-          <div className="mt-4">
-            <Button 
-              variant="outline" 
-              onClick={() => setSoilResult(null)}
-              className="w-full"
-            >
-              {t('soilAnalysis.analyzeAnotherSoilSample')}
-            </Button>
+        </div>
+        
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {/* Recommendations section */}
+          <div className="bg-white rounded-lg p-4 border border-gray-200 shadow-sm">
+            <h4 className="text-sm font-medium text-slate-700 mb-2 flex items-center">
+              <Droplets className="h-4 w-4 text-blue-500 mr-2" />
+              {t('soilAnalysis.recommendations')}
+            </h4>
+            <p className="text-sm text-slate-600 max-h-32 overflow-y-auto">{soilResult.recommendations}</p>
           </div>
+          
+          {/* Suitable crops section */}
+          <div className="bg-white rounded-lg p-4 border border-gray-200 shadow-sm">
+            <h4 className="text-sm font-medium text-slate-700 mb-2 flex items-center">
+              <Leaf className="h-4 w-4 text-green-500 mr-2" />
+              {t('soilAnalysis.suitableCrops')}
+            </h4>
+            <div className="flex flex-wrap gap-2 mt-1">
+              {soilResult.suitableCrops.map((crop, index) => (
+                <span 
+                  key={index} 
+                  className="px-3 py-1.5 bg-green-50 text-green-800 rounded-full text-xs font-medium shadow-sm border border-green-100"
+                >
+                  {crop}
+                </span>
+              ))}
+            </div>
+          </div>
+        </div>
+        
+        <div className="flex justify-center mt-4">
+          <Button 
+            variant="outline" 
+            onClick={() => setSoilResult(null)}
+            className="px-6"
+          >
+            {t('soilAnalysis.analyzeAnotherSoilSample')}
+          </Button>
         </div>
       </div>
     );
@@ -506,57 +694,118 @@ const DiseaseDetectionCard = ({ initialImage = null, initialAnalysisType = 'dise
   const renderPesticideResult = () => {
     if (!pesticideResult) return null;
     
-    return (
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div className="overflow-hidden rounded-lg border border-gray-200">
-          <img 
-            src={pesticideResult.imageSrc ?? ''} 
-            alt="Crop pest image" 
-            className="w-full h-auto"
-          />
+    // Helper function for pest severity badges
+    const getSeverityBadge = (severity: string) => {
+      const severityStyles = {
+        'Low': 'bg-yellow-100 text-yellow-800 border-yellow-200',
+        'Medium': 'bg-orange-100 text-orange-800 border-orange-200',
+        'High': 'bg-red-100 text-red-800 border-red-200'
+      };
+      
+      const severityIcons = {
+        'Low': '●',
+        'Medium': '●●',
+        'High': '●●●'
+      };
+      
+      return (
+        <div className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium border ${severityStyles[severity as keyof typeof severityStyles]}`}>
+          <span className="mr-1">{severityIcons[severity as keyof typeof severityIcons]}</span>
+          {severity} Severity
         </div>
-        <div>
-          <div className="flex items-center mb-3">
-            <Bug className={`h-5 w-5 ${getSeverityColor(pesticideResult.severity)} mr-2`} />
-            <h3 className="font-semibold text-lg">{pesticideResult.pestType}</h3>
+      );
+    };
+    
+    return (
+      <div className="space-y-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="overflow-hidden rounded-lg border border-gray-200">
+            <img 
+              src={pesticideResult.imageSrc ?? ''} 
+              alt="Crop pest image" 
+              className="w-full h-auto object-cover"
+            />
           </div>
-          
-          <div className="space-y-3">
-            <div>
-              <span className="text-sm text-gray-500">{t('pestAnalysis.severity')}</span>
-              <div className="flex items-center">
-                <span className={`font-medium ${getSeverityColor(pesticideResult.severity)}`}>
-                  {pesticideResult.severity}
-                  {pesticideResult.severity !== 'Low' ? ' ⚠️' : ''}
-                </span>
+          <div className="bg-gradient-to-br from-amber-50 to-red-50 rounded-lg p-4 border border-amber-100">
+            <div className="flex items-center mb-4">
+              <div className="h-12 w-12 rounded-full bg-amber-100 flex items-center justify-center text-amber-800 mr-3">
+                <Bug className="h-6 w-6" />
+              </div>
+              <div>
+                <h3 className="font-semibold text-lg text-slate-800">{pesticideResult.pestType}</h3>
+                {getSeverityBadge(pesticideResult.severity)}
               </div>
             </div>
             
-            <div>
-              <span className="text-sm text-gray-500">{t('pestAnalysis.recommendedPesticides')}</span>
-              <p className="text-sm">{pesticideResult.pesticideRecommendations}</p>
+            <div className="mt-4 flex items-center">
+              <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
+                <div 
+                  className={`h-full ${
+                    pesticideResult.severity === 'Low' ? 'bg-yellow-500' :
+                    pesticideResult.severity === 'Medium' ? 'bg-orange-500' :
+                    'bg-red-500'
+                  }`}
+                  style={{ 
+                    width: `${
+                      pesticideResult.severity === 'Low' ? '33' :
+                      pesticideResult.severity === 'Medium' ? '66' : '100'
+                    }%` 
+                  }}
+                ></div>
+              </div>
             </div>
-            
-            <div>
-              <span className="text-sm text-gray-500">{t('pestAnalysis.organicAlternatives')}</span>
-              <p className="text-sm">{pesticideResult.organicAlternatives}</p>
-            </div>
-            
-            <div>
-              <span className="text-sm text-gray-500">{t('pestAnalysis.preventionTips')}</span>
-              <p className="text-sm">{pesticideResult.preventionTips}</p>
+          </div>
+        </div>
+        
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {/* Recommended pesticides card */}
+          <div className="bg-white rounded-lg p-4 border border-gray-200 shadow-sm">
+            <h4 className="text-sm font-medium text-slate-700 mb-2 flex items-center">
+              <div className="h-5 w-5 rounded-full bg-amber-100 flex items-center justify-center text-amber-800 mr-2">
+                <span className="text-xs">1</span>
+              </div>
+              {t('pestAnalysis.recommendedPesticides')}
+            </h4>
+            <div className="bg-amber-50 p-3 rounded-md border border-amber-100">
+              <p className="text-sm text-slate-700 max-h-24 overflow-y-auto">{pesticideResult.pesticideRecommendations}</p>
             </div>
           </div>
           
-          <div className="mt-4">
-            <Button 
-              variant="outline" 
-              onClick={() => setPesticideResult(null)}
-              className="w-full"
-            >
-              {t('pestAnalysis.analyzeAnotherImage')}
-            </Button>
+          {/* Organic alternatives card */}
+          <div className="bg-white rounded-lg p-4 border border-gray-200 shadow-sm">
+            <h4 className="text-sm font-medium text-slate-700 mb-2 flex items-center">
+              <div className="h-5 w-5 rounded-full bg-green-100 flex items-center justify-center text-green-800 mr-2">
+                <span className="text-xs">2</span>
+              </div>
+              {t('pestAnalysis.organicAlternatives')}
+            </h4>
+            <div className="bg-green-50 p-3 rounded-md border border-green-100">
+              <p className="text-sm text-slate-700 max-h-24 overflow-y-auto">{pesticideResult.organicAlternatives}</p>
+            </div>
           </div>
+          
+          {/* Prevention tips card */}
+          <div className="bg-white rounded-lg p-4 border border-gray-200 shadow-sm">
+            <h4 className="text-sm font-medium text-slate-700 mb-2 flex items-center">
+              <div className="h-5 w-5 rounded-full bg-blue-100 flex items-center justify-center text-blue-800 mr-2">
+                <span className="text-xs">3</span>
+              </div>
+              {t('pestAnalysis.preventionTips')}
+            </h4>
+            <div className="bg-blue-50 p-3 rounded-md border border-blue-100">
+              <p className="text-sm text-slate-700 max-h-24 overflow-y-auto">{pesticideResult.preventionTips}</p>
+            </div>
+          </div>
+        </div>
+        
+        <div className="flex justify-center mt-4">
+          <Button 
+            variant="outline" 
+            onClick={() => setPesticideResult(null)}
+            className="px-6"
+          >
+            {t('pestAnalysis.analyzeAnotherImage')}
+          </Button>
         </div>
       </div>
     );
@@ -568,7 +817,7 @@ const DiseaseDetectionCard = ({ initialImage = null, initialAnalysisType = 'dise
         <CardTitle className="text-lg font-semibold text-agri-green">
           <div className="flex items-center">
             <Scan className="mr-2 h-5 w-5" />
-            {t('diseaseScan and AiCropAnalysis')}
+            AgroLab and AI Crop Analysis
           </div>
         </CardTitle>
       </CardHeader>

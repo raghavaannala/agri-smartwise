@@ -69,6 +69,14 @@ const sidebarItems: SidebarItem[] = [
     category: 'main'
   },
   { 
+    name: 'AgroLab', 
+    icon: FlaskConical, 
+    href: '/disease-scan',
+    color: 'bg-agri-tomato/10 text-agri-tomato',
+    translationKey: 'common.agroLab',
+    category: 'tools'
+  },
+  { 
     name: 'Soil Lab', 
     icon: FlaskConical, 
     href: '/soil-lab',
@@ -93,14 +101,6 @@ const sidebarItems: SidebarItem[] = [
     href: '/crop-advisor',
     color: 'bg-agri-freshGreen/10 text-agri-freshGreen',
     translationKey: 'common.cropAdvisor',
-    category: 'tools'
-  },
-  { 
-    name: 'Disease Scan', 
-    icon: Scan, 
-    href: '/disease-scan',
-    color: 'bg-agri-tomato/10 text-agri-tomato',
-    translationKey: 'common.diseaseScan',
     category: 'tools'
   },
   { 

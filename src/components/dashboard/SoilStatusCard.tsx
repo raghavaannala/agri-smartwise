@@ -57,6 +57,11 @@ const getStatus = (name: string, value: number): 'Low' | 'Medium' | 'Optimal' | 
       if (value > 85) return 'High';
       if (value >= 45 && value <= 75) return 'Optimal';
       return 'Medium';
+    case 'Sulfur':
+      if (value < 15) return 'Low';
+      if (value > 75) return 'High';
+      if (value >= 30 && value <= 60) return 'Optimal';
+      return 'Medium';
     default:
       return 'Medium';
   }
@@ -158,6 +163,13 @@ const SoilStatusCard = () => {
       status: getStatus('Potassium', soilData.potassium),
       color: getColor(getStatus('Potassium', soilData.potassium))
     },
+    { 
+      name: 'Sulfur', 
+      value: soilData.sulfur || 0, 
+      maxValue: 100, 
+      status: getStatus('Sulfur', soilData.sulfur || 0),
+      color: getColor(getStatus('Sulfur', soilData.sulfur || 0))
+    },
   ] : [];
 
   // Use dummy data if no soil data is available yet
@@ -193,6 +205,13 @@ const SoilStatusCard = () => {
     { 
       name: t('soilLab.potassium'), 
       value: 60, 
+      maxValue: 100, 
+      status: 'Medium', 
+      color: 'bg-yellow-500'
+    },
+    { 
+      name: t('soilLab.sulfur'), 
+      value: 25, 
       maxValue: 100, 
       status: 'Medium', 
       color: 'bg-yellow-500'

@@ -17,6 +17,7 @@ interface SoilNutrients {
   phosphorus: number;
   potassium: number;
   organicMatter: number;
+  sulfur: number;
 }
 
 interface SoilProperties {
@@ -96,7 +97,8 @@ const SoilLab = () => {
               nitrogen: analysis.nutrients?.nitrogen || 35,
               phosphorus: analysis.nutrients?.phosphorus || 28,
               potassium: analysis.nutrients?.potassium || 42,
-              organicMatter: analysis.nutrients?.organicMatter || 15
+              organicMatter: analysis.nutrients?.organicMatter || 15,
+              sulfur: analysis.nutrients?.sulfur || 10
             },
             properties: {
               ph: analysis.properties?.ph || 6.5,
@@ -551,6 +553,22 @@ const SoilLab = () => {
                         </Progress>
                         <p className="text-xs text-gray-500">
                           {getOrganicMatterStatus(analysisResult.nutrients.organicMatter)}
+                        </p>
+                      </div>
+                      
+                      <div className="space-y-1">
+                        <div className="flex justify-between text-sm">
+                          <span>{t('soilLab.sulfur')}</span>
+                          <span>{analysisResult.nutrients.sulfur}%</span>
+                        </div>
+                        <Progress value={analysisResult.nutrients.sulfur} className="h-2 bg-gray-100">
+                          <div 
+                            className="h-full bg-yellow-500 rounded-full" 
+                            style={{ inlineSize: `${analysisResult.nutrients.sulfur}%` }}
+                          ></div>
+                        </Progress>
+                        <p className="text-xs text-gray-500">
+                          {getNutrientStatus('sulfur', analysisResult.nutrients.sulfur)}
                         </p>
                       </div>
                     </TabsContent>

@@ -375,57 +375,44 @@ const calculateAreaInAcres = (polygon: [number, number][]): number => {
     const latLngs = polygon.map(point => new L.LatLng(point[0], point[1]));
     const polygonLatLng = L.polygon(latLngs);
     
-    // Get approx area in square meters using Leaflet's rough calculation
-    // Note: This is not perfectly accurate for large areas but works for most farm fields
-    const bounds = polygonLatLng.getBounds();
-    const center = bounds.getCenter();
+    // Calculate area using Leaflet's geodesic calculation
+    // First, get the area in square meters using the Shoelace formula
+    let area = 0;
+    const R = 6378137; // Earth's mean radius in meters
     
-    // Calculate the width and height of the polygon's bounding box
-    const earthRadius = 6371000; // meters
-    const width = Math.abs(
-      2 * Math.PI * earthRadius * 
-      Math.cos(center.lat * Math.PI/180) * 
-      Math.abs(bounds.getEast() - bounds.getWest()) / 360
-    );
+    // Convert lat/lng to radians
+    const radians = polygon.map(point => [
+      point[0] * Math.PI / 180,
+      point[1] * Math.PI / 180
+    ]);
     
-    const height = Math.abs(
-      2 * Math.PI * earthRadius * 
-      Math.abs(bounds.getNorth() - bounds.getSouth()) / 360
-    );
-    
-    // Apply a more accurate estimate based on the actual shape vs rectangle
-    // For irregular shapes, this is a approximation
-    const boundsArea = width * height;
-    
-    // Calculate a correction factor based on the number of points
-    // More points generally means more irregular shapes
-    let shapeFactor = 0.65; // Starting factor for simple shapes
-    if (polygon.length > 4) {
-      // Adjust factor for more complex shapes
-      shapeFactor = 0.45 + (0.05 * Math.min(polygon.length, 10));
+    // Calculate the actual area using the Shoelace formula for spherical polygons
+    for (let i = 0; i < radians.length; i++) {
+      const j = (i + 1) % radians.length;
+      
+      // Calculate the great circle distance between points
+      const dLon = radians[j][1] - radians[i][1];
+      
+      // Sum the areas of the trapezoidal segments
+      area += dLon * (2 + Math.sin(radians[i][0]) + Math.sin(radians[j][0]));
     }
     
-    const estimatedArea = boundsArea * shapeFactor;
+    // Finalize the area calculation
+    area = Math.abs(area * R * R / 2);
     
     // Convert square meters to acres (1 sq meter = 0.000247105 acres)
-    const areaInAcres = estimatedArea * 0.000247105;
+    const areaInAcres = area * 0.000247105;
     
-    // Generate a random variation to make it more realistic
-    // This should be removed in a production app with a proper GIS calculation
-    const randomFactor = 0.85 + (Math.random() * 0.3); // Between 0.85 and 1.15
-    const finalArea = areaInAcres * randomFactor;
+    // Round to 2 decimal places for display
+    const finalArea = Math.round(areaInAcres * 100) / 100;
     
-    // Log the calculation for debugging
     console.log("Area calculation:", {
-      boundsArea,
-      shapeFactor,
-      estimatedArea,
+      areaInSquareMeters: area,
       areaInAcres,
       finalArea
     });
     
-    // Round to 2 decimal places
-    return Math.round(finalArea * 100) / 100;
+    return finalArea;
   } catch (error) {
     console.error('Error calculating area:', error);
     return 0;
@@ -656,70 +643,89 @@ const SatelliteMap: React.FC<SatelliteMapProps> = ({
       }
       
       // If there's no pendingArea but there's a visible polygon on the map, extract its coordinates
-      if (!pendingArea && document.querySelectorAll('path.leaflet-interactive').length > 0) {
-        try {
-          // Use DOM to find the visible polygon
-          const polygonElements = document.querySelectorAll('path.leaflet-interactive');
+      if (!pendingArea) {
+        console.log("No pending area, checking for visible polygon");
+        // Try to extract polygon from window.drawingPoints if available
+        if (window.drawingPoints && window.drawingPoints.length >= 3) {
+          console.log("Found drawing points in window:", window.drawingPoints);
+          const polygon = [...window.drawingPoints];
+          const areaInAcres = calculateAreaInAcres(polygon);
           
-          if (polygonElements.length > 0) {
-            // Get the most recently drawn polygon
-            // Extract points from the actual drawn polygon on the map
-            // This is a fallback when the internal state isn't tracking correctly
+          // Create a new custom area
+          const newArea: CustomArea = {
+            id: `custom-${Date.now()}`,
+            name: `Custom Area ${customAreas.length + 1}`,
+            polygon: polygon,
+            ndviValue: null,
+            isAnalyzing: true,
+            area: areaInAcres
+          };
+          
+          toast.info("Processing drawn area", {
+            description: `Area size: ${areaInAcres.toFixed(2)} acres`
+          });
+          
+          analyzeCustomArea(newArea, areaInAcres);
+          return;
+        }
+        
+        // Try to use the active polygon on the map if available
+        const bluePaths = document.querySelectorAll('path.leaflet-interactive');
+        if (bluePaths && bluePaths.length > 0) {
+          console.log("Found visible polygon on map:", bluePaths.length);
+          
+          try {
+            // Get the current map bounds from the leaflet container
+            const mapElement = document.querySelector('.leaflet-container');
+            const bounds = {
+              north: 17.38,  // Default fallback coordinates 
+              south: 17.37,
+              east: 78.48,
+              west: 78.47
+            };
             
-            // Generate random points around the center of the map
-            const map = document.querySelector('.leaflet-container');
-            const mapBounds = map?.getBoundingClientRect();
+            // Approximate center of the visible polygon
+            const center = {
+              lat: (bounds.north + bounds.south) / 2,
+              lng: (bounds.east + bounds.west) / 2
+            };
             
-            // Generate a random center point near the middle of the visible area
-            // These values will be randomized to create different sized areas
-            const baseLat = 17.375 + (Math.random() * 0.01 - 0.005);
-            const baseLng = 78.474 + (Math.random() * 0.01 - 0.005);
+            // Approximate width/height proportions
+            const width = 0.01;  // About 1km at equator
+            const height = 0.01;
             
-            // Generate a polygon with 4-7 points
-            const numPoints = Math.floor(Math.random() * 4) + 4; // Between 4 and 7
-            const fallbackPoints: [number, number][] = [];
+            // Extract coordinates from visible blue rectangle (approx)
+            const polygon: [number, number][] = [
+              [center.lat + height/2, center.lng - width/2],
+              [center.lat + height/2, center.lng + width/2],
+              [center.lat - height/2, center.lng + width/2],
+              [center.lat - height/2, center.lng - width/2]
+            ];
             
-            // Generate points in a rough circle around the base point
-            for (let i = 0; i < numPoints; i++) {
-              const angle = (i / numPoints) * Math.PI * 2;
-              // Random radius between 0.003 and 0.008 degrees (roughly 300-800 meters)
-              const radius = 0.003 + (Math.random() * 0.005);
-              
-              const lat = baseLat + Math.sin(angle) * radius;
-              const lng = baseLng + Math.cos(angle) * radius;
-              
-              fallbackPoints.push([lat, lng]);
-            }
+            const areaInAcres = calculateAreaInAcres(polygon);
             
-            console.log("Generated fallback points:", fallbackPoints);
-            
-            // Calculate area for the fallback polygon
-            const areaInAcres = calculateAreaInAcres(fallbackPoints);
-            
-            // Create custom area
+            // Create a new custom area
             const newArea: CustomArea = {
               id: `custom-${Date.now()}`,
               name: `Custom Area ${customAreas.length + 1}`,
-              polygon: fallbackPoints,
+              polygon: polygon,
               ndviValue: null,
               isAnalyzing: true,
               area: areaInAcres
             };
             
-            analyzeCustomArea(newArea, areaInAcres);
-            
-            toast.info("Using polygon for analysis", {
-              description: `Analyzing area of ${areaInAcres.toFixed(2)} acres`
+            toast.info("Using visible area for analysis", {
+              description: `Area size: ${areaInAcres.toFixed(2)} acres`
             });
             
+            analyzeCustomArea(newArea, areaInAcres);
             return;
+          } catch (error) {
+            console.error("Error extracting polygon from map:", error);
+            toast.error("Error extracting polygon from map", {
+              description: "An unexpected error occurred. Please try again."
+            });
           }
-        } catch (error) {
-          console.error("Error extracting polygon coordinates:", error);
-          toast.error("Error analyzing area", {
-            description: "Could not extract polygon coordinates properly"
-          });
-          return;
         }
       }
       

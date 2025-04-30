@@ -1048,7 +1048,7 @@ const Index = () => {
                   <div className="p-2 bg-white/20 rounded-full mr-3">
                     <Scan className="h-5 w-5 text-white" />
                   </div>
-                  <h3 className="font-semibold">Disease Detection</h3>
+                  <h3 className="font-semibold">AgroLab</h3>
                 </div>
                 <p className="text-sm text-white/70 mb-3">Scan and identify crop diseases with AI-powered analysis</p>
                 <div className="flex items-center text-white/90 text-sm">
