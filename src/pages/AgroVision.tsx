@@ -418,7 +418,7 @@ const AgroVision = () => {
           
           {/* Add Draw Custom Area button here when map tab is active */}
           {activeTab === 'map' && mapInitialized && !isLoading && (
-            <div className="flex justify-end mb-4">
+            <div className="flex justify-end gap-3 mb-4">
               <Button
                 variant="default"
                 size="lg"
@@ -431,6 +431,34 @@ const AgroVision = () => {
               >
                 <Pencil className="h-5 w-5" />
                 <span className="text-base font-bold">Draw Custom Area</span>
+              </Button>
+              
+              <Button
+                variant="default"
+                size="lg"
+                className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white font-medium px-5 py-3"
+                onClick={() => {
+                  console.log("Analyze Area button clicked");
+                  if (window.analyzeDrawnArea) {
+                    console.log("Calling window.analyzeDrawnArea()");
+                    const success = window.analyzeDrawnArea();
+                    
+                    // If analysis was successful, consider showing analytics tab
+                    if (success && customAreas.length > 0) {
+                      setTimeout(() => {
+                        // Give time for the analysis to complete before switching tabs
+                        setActiveTab('analytics');
+                      }, 1500);
+                    }
+                  } else {
+                    toast.error("Analysis tool not available", { 
+                      description: "Please refresh the page and try again."
+                    });
+                  }
+                }}
+              >
+                <LineChart className="h-5 w-5" />
+                <span className="text-base font-bold">Analyze Area</span>
               </Button>
             </div>
           )}
@@ -550,46 +578,22 @@ const AgroVision = () => {
           </div>
         </Card>
 
-        {/* Update the fixed floating buttons section with a permanently visible analyze button */}
+        {/* Update floating buttons section - remove Analyze button, keep only Draw Area */}
         <div className="fixed bottom-8 right-8 z-[9999] flex flex-col gap-3">
-          <Button
-            size="lg"
-            className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white font-medium px-5 py-6 rounded-full shadow-lg"
-            onClick={() => {
-              console.log("Fixed Analyze button clicked");
-              // Force analyze regardless of pending state
-              if (window.analyzeDrawnArea) {
-                console.log("Calling window.analyzeDrawnArea() from fixed button");
-                window.analyzeDrawnArea();
-                // Don't switch tabs automatically - user should first see analysis on the map
-              } else {
-                toast.error("Analysis tool not available", { 
-                  description: "Please refresh the page and try again."
-                });
-              }
-            }}
-          >
-            <LineChart className="h-6 w-6" />
-            <span className="text-lg font-bold">Analyze Area</span>
-          </Button>
-          
           <Button
             size="lg"
             className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-medium px-5 py-6 rounded-full shadow-lg"
             onClick={() => {
-              console.log("Fixed Analyze button clicked");
+              console.log("Draw Area button clicked");
               // First ensure the map tab is active
               setActiveTab('map');
               
               // Then try to start drawing after a small delay
               setTimeout(() => {
-                // Get the SatelliteMap component's startDrawing function
-                const mapElement = document.querySelector('.leaflet-container');
-                if (mapElement && window.startDrawingPolygon) {
+                if (window.startDrawingPolygon) {
                   try {
-                    console.log("Calling window.startDrawingPolygon()");
+                    console.log("Starting drawing mode");
                     window.startDrawingPolygon();
-                    console.log('Drawing mode activated');
                   } catch (error) {
                     console.error('Error starting drawing:', error);
                     toast.error("Could not start drawing", { 

@@ -105,16 +105,6 @@ const DiseaseDetectionCard = ({ initialImage = null, initialAnalysisType = 'dise
     const file = event.target.files?.[0];
     if (!file) return;
 
-    // Check file size (limit to 5MB)
-    if (file.size > 5 * 1024 * 1024) {
-      toast({
-        title: t('diseaseScan.fileTooLarge'),
-        description: t('diseaseScan.fileTooLargeDescription'),
-        variant: "destructive"
-      });
-      return;
-    }
-
     const reader = new FileReader();
     reader.onload = async () => {
       try {

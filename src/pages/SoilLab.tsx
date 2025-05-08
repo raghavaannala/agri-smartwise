@@ -56,15 +56,6 @@ const SoilLab = () => {
     setNoSoilDetected(false);
     setAnalysisResult(null);
 
-    if (file.size > 5 * 1024 * 1024) {
-      toast({
-        title: t('fileTooLarge'),
-        description: t('pleaseSelectAnImageSmallerThan5MB'),
-        variant: "destructive"
-      });
-      return;
-    }
-
     const reader = new FileReader();
     reader.onload = async () => {
       try {

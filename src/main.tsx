@@ -1,6 +1,7 @@
 import { createRoot } from 'react-dom/client'
 import App from './App.tsx'
 import './index.css'
+import './styles/mobile.css'
 import { setupGeminiClient } from './config/geminiConfig'
 
 // Create a self-invoking async function to handle initialization

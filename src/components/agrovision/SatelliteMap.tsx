@@ -66,11 +66,12 @@ const DrawControl = ({ onAreaDrawn }: { onAreaDrawn: (polygon: [number, number][
     let isDrawing = false;
     let points: [number, number][] = [];
     let polygon: L.Polygon | null = null;
-    let marker: L.CircleMarker | null = null;
     let markersLayer = L.layerGroup().addTo(map);
     
     // Start drawing
     const startDrawing = () => {
+      console.log("⭐ DRAWING START - Clearing previous drawings");
+      
       // Clear any existing drawing
       if (polygon) map.removeLayer(polygon);
       markersLayer.clearLayers();
@@ -79,11 +80,12 @@ const DrawControl = ({ onAreaDrawn }: { onAreaDrawn: (polygon: [number, number][
       isDrawing = true;
       points = [];
       
-      // Create temporary polygon
+      // Create temporary polygon with bright, visible style
       polygon = L.polygon([], {
-        color: '#3B82F6', 
-        weight: 2,
-        fillOpacity: 0.2
+        color: '#FF3300', 
+        weight: 3,
+        fillOpacity: 0.4,
+        fillColor: '#FF9900'
       }).addTo(map);
       
       // Show help message
@@ -116,6 +118,41 @@ const DrawControl = ({ onAreaDrawn }: { onAreaDrawn: (polygon: [number, number][
       
       // Store reference to cancel button for cleanup
       window.cancelDrawingButton = cancelButton;
+      
+      // Also add an analyze button that appears when drawing is active
+      const analyzeButton = document.createElement('div');
+      analyzeButton.className = 'analyze-drawing absolute bottom-24 right-10 z-[3000] hidden';
+      analyzeButton.innerHTML = `
+        <button class="flex items-center bg-green-600 text-white px-4 py-2 rounded-md text-sm font-bold shadow-md">
+          <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" class="mr-1">
+            <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+          </svg>
+          Analyze This Area
+        </button>
+      `;
+      document.querySelector('.leaflet-container')?.appendChild(analyzeButton);
+      
+      analyzeButton.addEventListener('click', () => {
+        if (points.length >= 3) {
+          completeDrawing();
+          
+          // Immediately analyze this area
+          setTimeout(() => {
+            // Create and dispatch a custom event to trigger analysis
+            const analyzeEvent = new CustomEvent('analyzeDrawnArea', { 
+              detail: { points: [...points] }
+            });
+            window.dispatchEvent(analyzeEvent);
+          }, 500);
+        } else {
+          toast.error("Not enough points", {
+            description: "Add at least 3 points to create an area."
+          });
+        }
+      });
+      
+      // Store reference to analyze button
+      window.analyzeButton = analyzeButton;
     };
     
     // Handle map click during drawing
@@ -136,12 +173,16 @@ const DrawControl = ({ onAreaDrawn }: { onAreaDrawn: (polygon: [number, number][
       // Add point to array
       points.push([lat, lng]);
       
-      // Add marker at clicked point
+      // Log each point as it's added for debugging
+      console.log(`⭐ Added point [${lat}, ${lng}]`);
+      
+      // Add marker at clicked point with bright colors
       const circleMarker = L.circleMarker([lat, lng], {
-        radius: 5,
-        color: '#3B82F6',
-        fillColor: '#3B82F6',
-        fillOpacity: 0.7
+        radius: 6,
+        color: '#FF3300',
+        fillColor: '#FF9900',
+        fillOpacity: 1,
+        weight: 2
       });
       
       // Allow closing polygon by clicking first marker
@@ -159,6 +200,11 @@ const DrawControl = ({ onAreaDrawn }: { onAreaDrawn: (polygon: [number, number][
       if (polygon) {
         polygon.setLatLngs(points);
       }
+      
+      // Show the analyze button once we have at least 3 points
+      if (points.length >= 3 && window.analyzeButton) {
+        window.analyzeButton.classList.remove('hidden');
+      }
     };
     
     // Complete drawing and submit polygon
@@ -174,16 +220,81 @@ const DrawControl = ({ onAreaDrawn }: { onAreaDrawn: (polygon: [number, number][
       map.off('click', handleMapClick);
       isDrawing = false;
       
-      // Call the callback with polygon points
-      onAreaDrawn([...points]);
+      // CRITICAL: Store points globally so they can be accessed by analyzeDrawnArea
+      // Make a deep copy to ensure we don't lose the reference
+      const pointsCopy = JSON.parse(JSON.stringify(points));
+      window.drawingPoints = pointsCopy;
       
-      // Remove cancel button
+      console.log('⭐ DRAWING COMPLETE - Storing points globally');
+      console.log('⭐ Points array length:', window.drawingPoints.length);
+      
+      // Immediately validate that the points were stored correctly
+      if (!window.drawingPoints || window.drawingPoints.length < 3) {
+        console.error('⚠️ CRITICAL ERROR: Drawing points not stored correctly!');
+        toast.error("Error storing drawing", {
+          description: "Please try drawing again."
+        });
+      } else {
+        console.log('✅ Drawing points stored successfully');
+      }
+      
+      // Make the polygon permanent with a distinct style
+      if (polygon) {
+        polygon.setStyle({
+          color: '#FF3300',
+          weight: 4,
+          fillColor: '#FF9900',
+          fillOpacity: 0.6,
+          dashArray: ''
+        });
+        
+        // Add a popup to the polygon
+        polygon.bindPopup(
+          `<div class="text-center">
+            <strong>Drawn Area</strong><br>
+            ${pointsCopy.length} points<br>
+            <button id="analyze-popup-btn" class="bg-green-600 text-white px-2 py-1 rounded mt-2 text-sm">
+              Analyze This Area
+            </button>
+          </div>`
+        ).openPopup();
+        
+        // Add click handler after a short delay
+        setTimeout(() => {
+          const analyzeBtn = document.getElementById('analyze-popup-btn');
+          if (analyzeBtn) {
+            analyzeBtn.addEventListener('click', () => {
+              // Create and dispatch a custom event to trigger analysis
+              const analyzeEvent = new CustomEvent('analyzeDrawnArea', { 
+                detail: { points: pointsCopy }
+              });
+              window.dispatchEvent(analyzeEvent);
+              
+              // Close the popup after clicking
+              if (polygon) polygon.closePopup();
+            });
+          }
+        }, 100);
+      }
+      
+      // Call the callback with the EXACT polygon points
+      onAreaDrawn([...pointsCopy]);
+      
+      // Remove UI elements
       if (window.cancelDrawingButton) {
         window.cancelDrawingButton.remove();
         window.cancelDrawingButton = null;
       }
       
-      // Keep the polygon visible for now (will be replaced by the actual one)
+      if (window.analyzeButton) {
+        window.analyzeButton.remove();
+        window.analyzeButton = null;
+      }
+      
+      // Add toast confirming the drawing is ready for analysis
+      toast.success("Area drawing complete", { 
+        description: "Click the Analyze Area button to analyze this region."
+      });
     };
     
     // Cancel drawing operation
@@ -196,10 +307,15 @@ const DrawControl = ({ onAreaDrawn }: { onAreaDrawn: (polygon: [number, number][
       if (polygon) map.removeLayer(polygon);
       markersLayer.clearLayers();
       
-      // Remove cancel button
+      // Remove UI elements
       if (window.cancelDrawingButton) {
         window.cancelDrawingButton.remove();
         window.cancelDrawingButton = null;
+      }
+      
+      if (window.analyzeButton) {
+        window.analyzeButton.remove();
+        window.analyzeButton = null;
       }
       
       toast.info("Drawing cancelled");
@@ -207,6 +323,38 @@ const DrawControl = ({ onAreaDrawn }: { onAreaDrawn: (polygon: [number, number][
     
     // IMPORTANT: Expose the drawing function to window
     window.startDrawingPolygon = startDrawing;
+    
+    // Listen for the custom analyzeDrawnArea event
+    const handleAnalyzeEvent = (event: Event) => {
+      const customEvent = event as CustomEvent;
+      if (customEvent.detail && customEvent.detail.points) {
+        console.log("⭐ Received analyzeDrawnArea event with points:", customEvent.detail.points);
+        
+        // Update window.drawingPoints to ensure latest points are used
+        window.drawingPoints = customEvent.detail.points;
+        
+        // Display visual feedback on the map
+        if (polygon) {
+          polygon.setStyle({
+            color: '#00FF00',
+            weight: 4,
+            fillColor: '#33FF33',
+            fillOpacity: 0.7,
+            dashArray: '5,5'
+          });
+          
+          // Add an "Analyzing" popup
+          polygon.bindPopup(
+            `<div class="text-center">
+              <strong>Analyzing Area...</strong><br>
+              <div class="animate-pulse mt-1">Please wait</div>
+            </div>`
+          ).openPopup();
+        }
+      }
+    };
+    
+    window.addEventListener('analyzeDrawnArea', handleAnalyzeEvent);
     
     // Clean up
     return () => {
@@ -217,6 +365,12 @@ const DrawControl = ({ onAreaDrawn }: { onAreaDrawn: (polygon: [number, number][
       if (window.cancelDrawingButton) {
         window.cancelDrawingButton.remove();
       }
+      
+      if (window.analyzeButton) {
+        window.analyzeButton.remove();
+      }
+      
+      window.removeEventListener('analyzeDrawnArea', handleAnalyzeEvent);
       
       // Clean up the window reference
       window.startDrawingPolygon = undefined;
@@ -234,7 +388,8 @@ declare global {
     closeDrawingButton: L.Control | null;
     cancelDrawingButton: HTMLDivElement | null;
     startDrawingPolygon?: () => void;
-    analyzeDrawnArea?: () => void;
+    analyzeDrawnArea?: () => boolean;
+    analyzeButton: HTMLDivElement | null;
   }
 }
 
@@ -536,40 +691,54 @@ const SatelliteMap: React.FC<SatelliteMapProps> = ({
   
   // Handle custom area drawn
   const handleAreaDrawn = (polygon: [number, number][]) => {
-    console.log('Area drawn with points:', polygon);
+    console.log('👉 Area drawn with points:', polygon);
     
-    // Validate polygon has enough points
-    if (polygon.length < 3) {
-      toast.error("Invalid area", {
-        description: "A polygon must have at least 3 points. Please try drawing again."
+    try {
+      // Validate polygon has enough points
+      if (polygon.length < 3) {
+        toast.error("Invalid area", {
+          description: "A polygon must have at least 3 points. Please try drawing again."
+        });
+        return;
+      }
+      
+      // Calculate area in acres
+      const areaInAcres = calculateAreaInAcres(polygon);
+      console.log('👉 Area calculated:', areaInAcres, 'acres');
+      
+      // CRITICAL - Make a deep copy and store at BOTH places
+      const pointsCopy = JSON.parse(JSON.stringify(polygon));
+      
+      // 1. Store on window for direct access
+      window.drawingPoints = pointsCopy;
+      console.log('👉 DIRECT: Drawing points saved globally:', pointsCopy.length, 'points');
+      
+      // 2. Also store in component state as backup
+      setPendingArea({
+        polygon: pointsCopy,
+        area: areaInAcres
       });
-      return;
+      
+      // Exit drawing mode
+      setIsDrawingMode(false);
+      
+      // Notify parent about pending area
+      if (onCustomAreaUpdate) {
+        console.log('👉 Notifying parent of pending area');
+        onCustomAreaUpdate(customAreas, selectedCustomAreaId, true);
+      }
+      
+      // Show toast notification with area size
+      toast.success("Area drawn successfully", {
+        description: `Area: ${areaInAcres.toFixed(2)} acres. Click "Analyze Area" button to run analysis.`,
+        duration: 5000
+      });
+    } catch (error) {
+      console.error('Error handling drawn area:', error);
+      toast.error("Error processing drawn area", {
+        description: "Please try drawing again."
+      });
     }
-    
-    // Calculate area in acres
-    const areaInAcres = calculateAreaInAcres(polygon);
-    console.log('Area calculated:', areaInAcres, 'acres');
-    
-    // Set the drawn area as pending analysis
-    setPendingArea({
-      polygon,
-      area: areaInAcres
-    });
-    
-    // Exit drawing mode
-    setIsDrawingMode(false);
-    
-    // Notify parent about pending area
-    if (onCustomAreaUpdate) {
-      console.log('Notifying parent of pending area');
-      onCustomAreaUpdate(customAreas, selectedCustomAreaId, true);
-    }
-    
-    // Show toast notification with area size
-    toast.info("Area drawn successfully", {
-      description: `Area size: ${areaInAcres.toFixed(2)} acres. Click "Analyze Area" button to perform NDVI analysis.`,
-      duration: 5000
-    });
   };
   
   // Start drawing mode
@@ -621,14 +790,97 @@ const SatelliteMap: React.FC<SatelliteMapProps> = ({
     }
   };
   
-  // Add a more robust analyze method that works with the current polygon
+  // Define analyzeCustomArea before handleAnalyzeArea function
+  const analyzeCustomArea = useCallback((area: CustomArea, areaInAcres: number) => {
+    console.log("ANALYZING EXACT AREA:", {
+      id: area.id,
+      pointsCount: area.polygon.length,
+      points: area.polygon,
+      area: areaInAcres
+    });
+    
+    // Show toast about analysis starting
+    toast.info(`Analyzing area of ${areaInAcres.toFixed(2)} acres`, {
+      description: `Processing ${area.polygon.length} coordinate points...`,
+      duration: 5000
+    });
+    
+    // Simulate API call with timeout
+    setTimeout(() => {
+      // Update with fake NDVI value - using a number instead of a string
+      setCustomAreas(prev => 
+        prev.map(existingArea => 
+          existingArea.id === area.id 
+            ? { 
+                ...existingArea, 
+                isAnalyzing: false,
+                ndviValue: parseFloat((Math.random() * 0.5 + 0.2).toFixed(2)) // Ensure it's a number
+              } 
+            : existingArea
+        )
+      );
+      
+      toast.success("Analysis complete", {
+        description: "Vegetation health information is now available."
+      });
+      
+      // Dispatch an event to update the parent
+      if (onCustomAreaUpdate) {
+        onCustomAreaUpdate(
+          customAreas.map(existingArea => 
+            existingArea.id === area.id 
+              ? { 
+                  ...existingArea, 
+                  isAnalyzing: false,
+                  ndviValue: parseFloat((Math.random() * 0.5 + 0.2).toFixed(2)) 
+                } 
+              : existingArea
+          ),
+          area.id,
+          false
+        );
+      }
+      
+    }, 2500);
+  }, [customAreas, onCustomAreaUpdate]);
+
   const handleAnalyzeArea = useCallback(() => {
-    console.log("Analyze function called", { pendingArea, visiblePolygon });
+    console.log("Analyze function called with drawingPoints:", window.drawingPoints);
     
     try {
-      // If we have a pendingArea, use that
-      if (pendingArea) {
-        // Create a new custom area
+      // Use the exact points that were drawn on the map
+      if (window.drawingPoints && window.drawingPoints.length >= 3) {
+        console.log("EXACT USER DRAWN POINTS:", window.drawingPoints);
+        const polygon = window.drawingPoints;
+        const areaInAcres = calculateAreaInAcres(polygon);
+        
+        // Create a new custom area with the EXACT coordinates
+        const newArea: CustomArea = {
+          id: `custom-${Date.now()}`,
+          name: `Custom Area ${customAreas.length + 1}`,
+          polygon: polygon,
+          ndviValue: null,
+          isAnalyzing: true,
+          area: areaInAcres
+        };
+        
+        // Add the area to our state
+        const updatedAreas = [...customAreas, newArea];
+        setCustomAreas(updatedAreas);
+        setSelectedCustomAreaId(newArea.id);
+        
+        // Clear pending area since we're committing it now
+        setPendingArea(null);
+        
+        // Analyze the EXACT area that was just drawn
+        console.log("Starting analysis of drawn area with ID:", newArea.id);
+        analyzeCustomArea(newArea, areaInAcres);
+        
+        return true;
+      } else if (pendingArea) {
+        // Fallback to pending area if available
+        console.log("Using pendingArea with coordinates:", pendingArea.polygon);
+        
         const newArea: CustomArea = {
           id: `custom-${Date.now()}`,
           name: `Custom Area ${customAreas.length + 1}`,
@@ -638,167 +890,31 @@ const SatelliteMap: React.FC<SatelliteMapProps> = ({
           area: pendingArea.area
         };
         
+        // Add the area to our state
+        const updatedAreas = [...customAreas, newArea];
+        setCustomAreas(updatedAreas);
+        setSelectedCustomAreaId(newArea.id);
+        setPendingArea(null);
+        
+        // Analyze the area
         analyzeCustomArea(newArea, pendingArea.area);
-        return;
-      }
-      
-      // If there's no pendingArea but there's a visible polygon on the map, extract its coordinates
-      if (!pendingArea) {
-        console.log("No pending area, checking for visible polygon");
-        // Try to extract polygon from window.drawingPoints if available
-        if (window.drawingPoints && window.drawingPoints.length >= 3) {
-          console.log("Found drawing points in window:", window.drawingPoints);
-          const polygon = [...window.drawingPoints];
-          const areaInAcres = calculateAreaInAcres(polygon);
-          
-          // Create a new custom area
-          const newArea: CustomArea = {
-            id: `custom-${Date.now()}`,
-            name: `Custom Area ${customAreas.length + 1}`,
-            polygon: polygon,
-            ndviValue: null,
-            isAnalyzing: true,
-            area: areaInAcres
-          };
-          
-          toast.info("Processing drawn area", {
-            description: `Area size: ${areaInAcres.toFixed(2)} acres`
-          });
-          
-          analyzeCustomArea(newArea, areaInAcres);
-          return;
-        }
-        
-        // Try to use the active polygon on the map if available
-        const bluePaths = document.querySelectorAll('path.leaflet-interactive');
-        if (bluePaths && bluePaths.length > 0) {
-          console.log("Found visible polygon on map:", bluePaths.length);
-          
-          try {
-            // Get the current map bounds from the leaflet container
-            const mapElement = document.querySelector('.leaflet-container');
-            const bounds = {
-              north: 17.38,  // Default fallback coordinates 
-              south: 17.37,
-              east: 78.48,
-              west: 78.47
-            };
-            
-            // Approximate center of the visible polygon
-            const center = {
-              lat: (bounds.north + bounds.south) / 2,
-              lng: (bounds.east + bounds.west) / 2
-            };
-            
-            // Approximate width/height proportions
-            const width = 0.01;  // About 1km at equator
-            const height = 0.01;
-            
-            // Extract coordinates from visible blue rectangle (approx)
-            const polygon: [number, number][] = [
-              [center.lat + height/2, center.lng - width/2],
-              [center.lat + height/2, center.lng + width/2],
-              [center.lat - height/2, center.lng + width/2],
-              [center.lat - height/2, center.lng - width/2]
-            ];
-            
-            const areaInAcres = calculateAreaInAcres(polygon);
-            
-            // Create a new custom area
-            const newArea: CustomArea = {
-              id: `custom-${Date.now()}`,
-              name: `Custom Area ${customAreas.length + 1}`,
-              polygon: polygon,
-              ndviValue: null,
-              isAnalyzing: true,
-              area: areaInAcres
-            };
-            
-            toast.info("Using visible area for analysis", {
-              description: `Area size: ${areaInAcres.toFixed(2)} acres`
-            });
-            
-            analyzeCustomArea(newArea, areaInAcres);
-            return;
-          } catch (error) {
-            console.error("Error extracting polygon from map:", error);
-            toast.error("Error extracting polygon from map", {
-              description: "An unexpected error occurred. Please try again."
-            });
-          }
-        }
-      }
-      
-      // If we still don't have a polygon, show an error
-      toast.error("No area to analyze", {
-        description: "Please draw an area on the map first"
-      });
-    } catch (error) {
-      console.error("Error in handleAnalyzeArea:", error);
-      toast.error("Error analyzing area", {
-        description: "An unexpected error occurred. Please try again."
-      });
-    }
-  }, [pendingArea, customAreas, onCustomAreaUpdate, selectedCustomAreaId, visiblePolygon]);
-
-  // Add a helper function to analyze a custom area
-  const analyzeCustomArea = (newArea: CustomArea, areaInAcres: number) => {
-    console.log("analyzeCustomArea called with:", { newArea, areaInAcres });
-    
-    setCustomAreas(prev => {
-      const newAreas = [...prev, newArea];
-      console.log("Updated custom areas:", newAreas);
-      if (onCustomAreaUpdate) {
-        console.log("Calling onCustomAreaUpdate with:", { newAreas, newId: newArea.id, pending: false });
-        onCustomAreaUpdate(newAreas, newArea.id, false);
+        return true;
       } else {
-        console.warn("onCustomAreaUpdate is not defined");
+        console.error("No area to analyze - no drawing points found");
+        toast.error("No area to analyze", {
+          description: "Please draw an area on the map first."
+        });
+        return false;
       }
-      return newAreas;
-    });
-    
-    setSelectedCustomAreaId(newArea.id);
-    
-    // Simulate NDVI calculation for the custom area
-    toast.info("Analyzing Area", {
-      description: `Calculating NDVI for your custom area (${areaInAcres.toFixed(2)} acres)...`,
-    });
-    
-    setTimeout(() => {
-      // Calculate a random NDVI value for the demo
-      // In a real implementation, you would call an API to calculate this
-      const randomNdvi = Math.random() * 0.6 + 0.2; // Between 0.2 and 0.8
-      console.log("Analysis complete, setting NDVI value:", randomNdvi.toFixed(2));
-      
-      setCustomAreas(prev => {
-        const updatedAreas = prev.map(area => 
-          area.id === newArea.id 
-            ? { ...area, ndviValue: parseFloat(randomNdvi.toFixed(2)), isAnalyzing: false } 
-            : area
-        );
-        
-        if (onCustomAreaUpdate) {
-          console.log("Calling onCustomAreaUpdate after analysis with:", { 
-            updatedAreas, 
-            newId: newArea.id, 
-            pending: false 
-          });
-          onCustomAreaUpdate(updatedAreas, newArea.id, false);
-        }
-        
-        return updatedAreas;
+    } catch (error) {
+      console.error("Error in analyze area:", error);
+      toast.error("Error analyzing area", {
+        description: "There was a problem processing your request. Please try again."
       });
-      
-      toast.success("Analysis Complete", {
-        description: `NDVI for ${newArea.name}: ${randomNdvi.toFixed(2)} | Area: ${areaInAcres.toFixed(2)} acres. Click the area to see detailed analytics.`,
-        duration: 5000
-      });
-      
-      // Clear the pending area after analysis
-      setPendingArea(null);
-    }, 800); // Reduced from 2000ms to 800ms for faster feedback
-  };
-  
+      return false;
+    }
+  }, [pendingArea, customAreas, analyzeCustomArea, setCustomAreas, setSelectedCustomAreaId]);
+
   // Replace the original NdviLegend component with our enhanced component
   const renderNdviLegend = () => {
     if (!ndviData) return null;
@@ -819,15 +935,117 @@ const SatelliteMap: React.FC<SatelliteMapProps> = ({
     
     // Explicitly set the window function with the current handleAnalyzeArea reference
     window.analyzeDrawnArea = () => {
-      console.log("analyzeDrawnArea called from window");
-      handleAnalyzeArea();
+      console.log("⭐ ANALYZE FUNCTION CALLED");
+      
+      // Create and dispatch a custom event to handle it in the DrawControl
+      try {
+        // First, check if we have drawing points
+        if (window.drawingPoints && window.drawingPoints.length >= 3) {
+          console.log("⭐ Using stored drawing points:", window.drawingPoints.length, "points");
+          
+          // Get the coordinates
+          const coordinates = window.drawingPoints;
+          
+          // Create a visible analyzed area
+          const newArea: CustomArea = {
+            id: `direct-${Date.now()}`,
+            name: `Analysis Result ${customAreas.length + 1}`,
+            polygon: coordinates,
+            ndviValue: null,
+            isAnalyzing: true,
+            area: calculateAreaInAcres(coordinates) || 10.0
+          };
+          
+          // Show toast notification
+          toast.info("Analyzing drawn area", {
+            description: `Processing ${coordinates.length} points...`,
+            duration: 3000
+          });
+          
+          // Add to state
+          setCustomAreas(prev => [...prev, newArea]);
+          setSelectedCustomAreaId(newArea.id);
+          
+          // Dispatch an event to update the polygon style
+          const visualEvent = new CustomEvent('analyzeDrawnArea', { 
+            detail: { points: coordinates }
+          });
+          window.dispatchEvent(visualEvent);
+          
+          // Simulate analysis
+          setTimeout(() => {
+            const randomNdvi = parseFloat((Math.random() * 0.5 + 0.2).toFixed(2));
+            
+            setCustomAreas(prev => 
+              prev.map(area => 
+                area.id === newArea.id 
+                  ? { ...area, ndviValue: randomNdvi, isAnalyzing: false }
+                  : area
+              )
+            );
+            
+            toast.success("Analysis complete!", {
+              description: `NDVI: ${randomNdvi.toFixed(2)} - View details in the analytics tab.`
+            });
+          }, 2000);
+          
+          return true;
+        } else {
+          console.error("⭐ No drawing points found");
+          
+          // Show error toast
+          toast.error("No area drawn", {
+            description: "Please draw an area on the map first."
+          });
+          
+          return false;
+        }
+      } catch (error) {
+        console.error("⭐ Error analyzing area:", error);
+        toast.error("Analysis failed", {
+          description: "Please try again with a new drawing."
+        });
+        return false;
+      }
     };
     
+    // Cleanup
     return () => {
-      // Clean up the window reference
       window.analyzeDrawnArea = undefined;
     };
-  }, [handleAnalyzeArea]); // Make sure it updates when handleAnalyzeArea changes
+  }, [customAreas, setCustomAreas, setSelectedCustomAreaId]);
+
+  useEffect(() => {
+    // Debug logging for custom areas
+    console.log("🔍 CUSTOM AREAS UPDATED:", customAreas);
+    if (customAreas.length > 0) {
+      customAreas.forEach(area => {
+        console.log(`Area ${area.id}: ${area.isAnalyzing ? 'Analyzing' : 'Analyzed'}, NDVI: ${area.ndviValue}, Points: ${area.polygon.length}`);
+      });
+    }
+  }, [customAreas]);
+
+  // Render function - mapped directly inside main component return
+  const renderCustomAreas = () => {
+    if (!customAreas || customAreas.length === 0) {
+      return <div className="absolute top-4 left-4 bg-white p-2 rounded shadow z-[2000]">No custom areas</div>;
+    }
+    
+    return (
+      <>
+        {/* Debug overlay to show custom areas status */}
+        <div className="absolute top-4 left-4 bg-white p-2 rounded shadow z-[2000] max-w-xs max-h-40 overflow-auto">
+          <h4 className="font-bold text-sm mb-1">Custom Areas ({customAreas.length})</h4>
+          {customAreas.map(area => (
+            <div key={area.id} className="text-xs mb-1">
+              {area.name}: {area.isAnalyzing ? '⏳' : '✅'} 
+              {area.ndviValue !== null ? ` NDVI: ${area.ndviValue.toFixed(2)}` : ''}
+            </div>
+          ))}
+        </div>
+      </>
+    );
+  };
 
   return (
     <div className="space-y-4">
@@ -869,6 +1087,21 @@ const SatelliteMap: React.FC<SatelliteMapProps> = ({
             </div>
           </div>
         ) : null}
+        
+        {/* Show "Analyze Area" button when a pending area exists */}
+        {pendingArea && (
+          <div className="absolute top-4 left-1/2 transform -translate-x-1/2 z-[2000]">
+            <Button
+              variant="default"
+              size="lg"
+              className="bg-green-600 hover:bg-green-700 text-white font-bold px-6 py-3 shadow-lg"
+              onClick={handleAnalyzeArea}
+            >
+              <LineChart className="h-5 w-5 mr-2" />
+              Analyze Area
+            </Button>
+          </div>
+        )}
         
         <MapContainer 
           {...{
@@ -939,16 +1172,17 @@ const SatelliteMap: React.FC<SatelliteMapProps> = ({
           {/* Custom drawn areas */}
           {customAreas.map(area => {
             const isSelected = selectedCustomAreaId === area.id;
+            const isAnalyzed = !area.isAnalyzing && area.ndviValue !== null;
             
             return (
               <Polygon
                 key={area.id}
                 positions={area.polygon}
                 pathOptions={{
-                  color: '#3B82F6',
+                  color: isAnalyzed ? '#FF0000' : '#3B82F6',
                   fillColor: area.ndviValue ? ndviToColor(area.ndviValue) : '#3B82F6',
-                  fillOpacity: isSelected ? 0.8 : 0.5,
-                  weight: isSelected ? 3 : 1.5,
+                  fillOpacity: isSelected ? 0.9 : isAnalyzed ? 0.8 : 0.5,
+                  weight: isSelected ? 4 : isAnalyzed ? 3 : 1.5,
                   dashArray: area.isAnalyzing ? '5, 5' : ''
                 }}
                 eventHandlers={{
@@ -958,12 +1192,12 @@ const SatelliteMap: React.FC<SatelliteMapProps> = ({
                 <Tooltip 
                   {...{
                     className: "bg-white/90 border-0 shadow-lg px-3 py-2",
-                    permanent: isSelected
+                    permanent: isSelected || isAnalyzed
                   } as any}
                 >
                   <div className="text-center">
                     <div className="font-medium flex items-center justify-between">
-                      {area.name}
+                      {area.name} {isAnalyzed && '✅'}
                       <button 
                         onClick={(e) => {
                           e.stopPropagation();
@@ -1063,6 +1297,8 @@ const SatelliteMap: React.FC<SatelliteMapProps> = ({
             </div>
           </div>
         )}
+        
+        {renderCustomAreas()}
       </div>
     </div>
   );

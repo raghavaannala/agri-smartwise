@@ -1,0 +1,63 @@
+/* Mobile-specific global styles */
+
+/* Better touch targets */
+@media (max-width: 768px) {
+  button, 
+  [role="button"],
+  a {
+    min-height: 42px !important;
+    min-width: 42px !important;
+    touch-action: manipulation;
+  }
+  
+  /* Prevent text from being too small on mobile */
+  body {
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+  }
+  
+  /* Fix for mobile overflow issues */
+  #root {
+    overflow-x: hidden;
+    width: 100%;
+  }
+  
+  /* Improve scrolling experience */
+  .scrollbar-hide {
+    -webkit-overflow-scrolling: touch;
+  }
+  
+  /* Proper tap highlight color */
+  a, button {
+    -webkit-tap-highlight-color: rgba(0, 128, 0, 0.1);
+  }
+  
+  /* Fix for common input issues on mobile */
+  input, select, textarea {
+    font-size: 16px !important; /* Prevents iOS zoom on focus */
+  }
+  
+  /* Force font boosting prevention */
+  * {
+    max-height: 1000000px;
+  }
+  
+  /* Sidebar specific fixes */
+  .sidebar-mobile {
+    height: 100dvh !important; /* Use dynamic viewport height */
+    max-height: 100dvh !important;
+    overscroll-behavior: contain; /* Prevent scroll chaining */
+  }
+  
+  /* Fix founders section display */
+  .px-3.pt-5.pb-4.relative {
+    display: block !important;
+    visibility: visible !important;
+  }
+  
+  /* Fix smooth scrolling */
+  nav.scrollbar-hide {
+    scroll-behavior: smooth;
+    -webkit-overflow-scrolling: touch;
+  }
+} 

@@ -1347,13 +1347,7 @@ const VoiceAssistant = () => {
                   <p className="text-sm opacity-70">
                     {t('voiceAssistant.tapMic', 'Tap the microphone button and speak to ask about farming.')}
                   </p>
-                  <div className="grid grid-cols-2 gap-2 max-w-xs mx-auto mt-4">
-                    <button 
-                      onClick={() => processCommand(t('voiceAssistant.sampleQuery1', 'What crops grow well in dry soil?'))}
-                      className="text-sm p-2 bg-green-50 dark:bg-green-900/30 rounded-lg hover:bg-green-100 dark:hover:bg-green-900/50 transition-colors text-green-700 dark:text-green-300"
-                    >
-                      {t('voiceAssistant.sampleQuery1', 'What crops grow well in dry soil?')}
-                    </button>
+                  <div className="grid grid-cols-1 gap-2 max-w-xs mx-auto mt-4">
                     <button 
                       onClick={() => processCommand(t('voiceAssistant.sampleQuery2', 'Who is the founder of SmartAgroX?'))}
                       className="text-sm p-2 bg-green-50 dark:bg-green-900/30 rounded-lg hover:bg-green-100 dark:hover:bg-green-900/50 transition-colors text-green-700 dark:text-green-300"
