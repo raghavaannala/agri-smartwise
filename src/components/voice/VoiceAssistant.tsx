@@ -94,8 +94,32 @@ const VoiceAssistant = () => {
   const [speechSupported, setSpeechSupported] = useState(false);
   useEffect(() => {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    setSpeechSupported(!!SpeechRecognition);
-  }, []);
+    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+    
+    if (SpeechRecognition) {
+      setSpeechSupported(true);
+      console.log("Speech recognition is supported");
+      
+      // Additional check for mobile devices
+      if (isMobile) {
+        console.log("Mobile device detected");
+        // Test if we can access the microphone
+        navigator.mediaDevices.getUserMedia({ audio: true })
+          .then(stream => {
+            console.log("Microphone access granted on mobile");
+            // Stop the test stream
+            stream.getTracks().forEach(track => track.stop());
+          })
+          .catch(err => {
+            console.error("Mobile microphone access error:", err);
+            toast.error(t('voiceAssistant.mobileMicError', 'Please ensure microphone access is enabled in your mobile browser settings'));
+          });
+      }
+    } else {
+      console.log("Speech recognition is not supported");
+      toast.error(t('voiceAssistant.notSupported', 'Speech recognition not supported in your browser'));
+    }
+  }, [t]);
 
   // Initialize Gemini client when component mounts
   useEffect(() => {
@@ -585,11 +609,17 @@ const VoiceAssistant = () => {
       // Handle start
       recognition.onstart = () => {
         setIsListening(true);
-        toast.success(t('voiceAssistant.listening', "I'm listening..."), { duration: 1500 });
+        // Show a more prominent message on mobile
+        const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+        if (isMobile) {
+          toast.success(t('voiceAssistant.listeningMobile', "I'm listening... Tap the microphone again when you're done."), { duration: 3000 });
+        } else {
+          toast.success(t('voiceAssistant.listening', "I'm listening..."), { duration: 1500 });
+        }
         console.log("Speech recognition started");
       };
       
-      // Handle results
+      // Handle results with mobile-specific handling
       recognition.onresult = (event: any) => {
         let interim = '';
         let final = '';
@@ -619,6 +649,10 @@ const VoiceAssistant = () => {
           console.log("Final transcript:", final);
           setTranscript(final);
           
+          // Adjust confidence threshold for mobile
+          const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+          const minConfidence = isMobile ? 0.3 : 0.5; // Lower threshold for mobile
+          
           // Only process if confidence is reasonable or we've had multiple attempts
           const shouldProcess = recognitionAttemptsRef.current >= 3 || final.length > 5;
           
@@ -633,9 +667,11 @@ const VoiceAssistant = () => {
         }
       };
       
-      // Handle errors
+      // Handle errors with mobile-specific messages
       recognition.onerror = (event: any) => {
         console.error("Speech recognition error:", event.error, event);
+        
+        const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
         
         if (event.error === 'not-allowed') {
           toast.error(t('voiceAssistant.micDenied', 'Microphone access denied'));
@@ -645,7 +681,10 @@ const VoiceAssistant = () => {
           
           // If we've had too many no-speech errors, show a message
           if (recognitionAttemptsRef.current > 3) {
-            toast.info(t('voiceAssistant.noSpeech', 'No speech detected. Please try again.'));
+            const message = isMobile 
+              ? t('voiceAssistant.noSpeechMobile', 'No speech detected. Please speak clearly and try again.')
+              : t('voiceAssistant.noSpeech', 'No speech detected. Please try again.');
+            toast.info(message);
           }
           
           // Restart recognition after a brief pause
@@ -672,7 +711,10 @@ const VoiceAssistant = () => {
         } else if (event.error === 'network') {
           toast.error(t('voiceAssistant.networkError', 'Network error. Please check your connection.'));
         } else if (event.error === 'audio-capture') {
-          toast.error(t('voiceAssistant.audioError', 'Audio capture problem. Please check your microphone.'));
+          const message = isMobile
+            ? t('voiceAssistant.audioErrorMobile', 'Audio capture problem. Please check your microphone permissions in browser settings.')
+            : t('voiceAssistant.audioError', 'Audio capture problem. Please check your microphone.');
+          toast.error(message);
         } else {
           toast.error(t('voiceAssistant.recognitionError', 'Speech recognition error. Please try again.'));
         }
@@ -715,9 +757,17 @@ const VoiceAssistant = () => {
     if (isListening) {
       stopListening();
     } else {
-      // Request microphone
+      // Request microphone with better error handling
       if (navigator.mediaDevices?.getUserMedia) {
-        navigator.mediaDevices.getUserMedia({ audio: true })
+        const constraints = {
+          audio: {
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true
+          }
+        };
+        
+        navigator.mediaDevices.getUserMedia(constraints)
           .then(stream => {
             // Store the stream for audio monitoring
             microphoneStreamRef.current = stream;
@@ -725,10 +775,20 @@ const VoiceAssistant = () => {
           })
           .catch(err => {
             console.error("Microphone error:", err);
-            toast.error(t('voiceAssistant.micDenied', 'Microphone access denied'));
+            let errorMessage = t('voiceAssistant.micDenied', 'Microphone access denied');
+            
+            if (err.name === 'NotAllowedError') {
+              errorMessage = t('voiceAssistant.micPermissionDenied', 'Please allow microphone access in your browser settings');
+            } else if (err.name === 'NotFoundError') {
+              errorMessage = t('voiceAssistant.micNotFound', 'No microphone found. Please connect a microphone and try again');
+            } else if (err.name === 'NotReadableError') {
+              errorMessage = t('voiceAssistant.micInUse', 'Microphone is in use by another application');
+            }
+            
+            toast.error(errorMessage);
           });
       } else {
-        startListening();
+        toast.error(t('voiceAssistant.micNotSupported', 'Microphone access is not supported in your browser'));
       }
     }
   }, [isListening, startListening, stopListening, t]);
