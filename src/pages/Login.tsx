@@ -37,9 +37,25 @@ const Login = () => {
       await login(email, password);
       toast.success('Successfully signed in!');
       navigate('/');
-    } catch (err) {
-      setError('Failed to sign in. Please check your credentials.');
-      console.error(err);
+    } catch (err: any) {
+      console.error('Login error:', err);
+      
+      // Provide specific error messages based on Firebase error codes
+      if (err.code === 'auth/user-not-found') {
+        setError('No account found with this email. Please check your email or sign up.');
+      } else if (err.code === 'auth/wrong-password') {
+        setError('Incorrect password. Please try again.');
+      } else if (err.code === 'auth/invalid-email') {
+        setError('Please enter a valid email address.');
+      } else if (err.code === 'auth/user-disabled') {
+        setError('This account has been disabled. Please contact support.');
+      } else if (err.code === 'auth/too-many-requests') {
+        setError('Too many failed attempts. Please try again later.');
+      } else if (err.code === 'auth/network-request-failed') {
+        setError('Network error. Please check your internet connection and try again.');
+      } else {
+        setError(`Sign in failed: ${err.message || 'Please check your credentials and try again.'}`);
+      }
     } finally {
       setLoading(false);
     }

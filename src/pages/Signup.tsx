@@ -48,9 +48,23 @@ const Signup = () => {
       await signup(email, password);
       toast.success('Account created successfully!');
       navigate('/');
-    } catch (err) {
-      setError('Failed to create an account');
-      console.error(err);
+    } catch (err: any) {
+      console.error('Signup error:', err);
+      
+      // Provide specific error messages based on Firebase error codes
+      if (err.code === 'auth/email-already-in-use') {
+        setError('An account with this email already exists. Please try signing in instead.');
+      } else if (err.code === 'auth/weak-password') {
+        setError('Password is too weak. Please choose a stronger password.');
+      } else if (err.code === 'auth/invalid-email') {
+        setError('Please enter a valid email address.');
+      } else if (err.code === 'auth/operation-not-allowed') {
+        setError('Email/password accounts are not enabled. Please contact support.');
+      } else if (err.code === 'auth/network-request-failed') {
+        setError('Network error. Please check your internet connection and try again.');
+      } else {
+        setError(`Failed to create account: ${err.message || 'Unknown error occurred'}`);
+      }
     } finally {
       setLoading(false);
     }
