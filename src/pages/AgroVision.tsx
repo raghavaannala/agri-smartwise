@@ -54,23 +54,38 @@ const AgroVision = () => {
   const [selectedCustomAreaId, setSelectedCustomAreaId] = useState<string | null>(null);
   const [hasPendingArea, setHasPendingArea] = useState(false);
   
-  // Load user farms on component mount
+  // Load user farms on component mount - works with or without authentication
   useEffect(() => {
     const loadFarms = async () => {
-      if (currentUser?.uid) {
-        try {
-          setIsLoading(true);
-          setError(null);
+      try {
+        setIsLoading(true);
+        setError(null);
+        
+        if (currentUser?.uid) {
+          // User is authenticated - load their farms
           const farms = await getUserFarms(currentUser.uid);
           setUserFarms(farms);
           if (farms.length > 0) setSelectedFarm(farms[0]);
-        } catch (error) {
-          console.error('Failed to load farms:', error);
-          toast.error('Failed to load farms');
-          setError('Failed to load farms. Please try again later.');
-        } finally {
-          setIsLoading(false);
+        } else {
+          // User not authenticated - use demo farms or allow custom area analysis
+          console.log('No user authenticated - running in demo mode for AgroVision');
+          setUserFarms([]);
+          // Create a demo farm for satellite analysis
+          const demoFarm = {
+            id: 'demo-farm-1',
+            name: 'Demo Farm',
+            location: 'Sample Location'
+          };
+          setUserFarms([demoFarm]);
+          setSelectedFarm(demoFarm);
+          toast.info('Demo Mode - Draw custom areas to analyze satellite data');
         }
+      } catch (error) {
+        console.error('Failed to load farms:', error);
+        toast.error('Failed to load farms');
+        setError('Failed to load farms. You can still use custom area analysis.');
+      } finally {
+        setIsLoading(false);
       }
     };
     
@@ -90,7 +105,7 @@ const AgroVision = () => {
         sessionStorage.setItem('force_refresh_ndvi', 'true');
       }
       
-      // Get NDVI data for the selected farm
+      // Get NDVI data for the selected farm (works for demo farms too)
       const data = await getFarmNdviData(selectedFarm.id, selectedFarm.name);
       
       // Filter data for selected date
@@ -251,7 +266,12 @@ const AgroVision = () => {
     <MainLayout>
       <div className="container mx-auto py-6">
         <div className="flex items-center justify-between mb-6">
-          <h1 className="text-3xl font-bold">{t('agroVision.title', 'AgroVision: Satellite Crop Health')}</h1>
+          <div>
+            <h1 className="text-3xl font-bold">{t('agroVision.title', 'AgroVision: Satellite Crop Health')}</h1>
+            {!currentUser && (
+              <p className="text-sm text-gray-600 mt-1">Demo Mode - Sign in to save your analysis results</p>
+            )}
+          </div>
           <div className="flex items-center space-x-2">
             <Button 
               variant="outline" 

@@ -59,38 +59,18 @@ const Farm = () => {
   const [showDeleteFarmDialog, setShowDeleteFarmDialog] = useState(false);
   const [farmToDelete, setFarmToDelete] = useState<FarmData | null>(null);
 
-  // Authentication and data loading
+  // Load farms without authentication requirement
   useEffect(() => {
     console.log('Farm component useEffect running');
     
-    try {
-      if (!auth) {
-        console.error('Auth object not available');
-        setAuthError('Firebase authentication not initialized');
-        setLoading(false);
-        return;
-      }
-      
-      console.log('Setting up auth state listener');
-      const unsubscribe = onAuthStateChanged(auth, async (user) => {
-        console.log('Auth state changed:', user ? 'User authenticated' : 'No user');
+    const loadFarms = async () => {
+      try {
+        setLoading(true);
         
-        if (!user) {
-          console.log('No user logged in, redirecting to login');
-          setLoading(false);
-          toast({
-            title: "Authentication Required",
-            description: "Please log in to access Farm Management",
-            variant: "destructive"
-          });
-          navigate('/login');
-          return;
-        }
-        
-        // Load farms
-        try {
-          console.log('Loading farms for user:', user.uid);
-          const userFarms = await getUserFarms(user.uid);
+        // Check if user is authenticated, if so load their farms
+        if (auth?.currentUser) {
+          console.log('Loading farms for user:', auth.currentUser.uid);
+          const userFarms = await getUserFarms(auth.currentUser.uid);
           console.log(`Loaded ${userFarms.length} farms`);
           
           setFarms(userFarms);
@@ -109,27 +89,29 @@ const Farm = () => {
               });
             }
           }
+        } else {
+          // User not authenticated - show demo/guest mode
+          console.log('No user authenticated - running in demo mode');
+          setFarms([]);
+          toast({
+            title: "Demo Mode",
+            description: "Sign in to save and manage your farms",
+            variant: "default"
+          });
+        }
       } catch (error) {
-          console.error('Error loading farms:', error);
+        console.error('Error loading farms:', error);
         toast({
-            title: "Data Loading Error",
-            description: "Unable to load your farms. Please try again.",
+          title: "Data Loading Error",
+          description: "Unable to load farms. You can still create demo farms.",
           variant: "destructive"
         });
       } finally {
         setLoading(false);
       }
-      });
-      
-      return () => {
-        console.log('Cleaning up auth listener');
-        unsubscribe();
-      };
-        } catch (error) {
-      console.error('Fatal error in Farm component useEffect:', error);
-      setAuthError(`Initialization error: ${error.message}`);
-      setLoading(false);
-    }
+    };
+    
+    loadFarms();
   }, [navigate, toast]);
 
   // Check network connectivity
@@ -187,19 +169,30 @@ const Farm = () => {
         soilType: farmDetailsForm.soilType,
         crops: farmDetailsForm.crops.filter(c => c.trim() !== ''),
         irrigationSystem: farmDetailsForm.irrigationSystem,
-        userId: auth.currentUser?.uid,
+        userId: auth?.currentUser?.uid || 'demo-user',
         createdAt: new Date(),
         updatedAt: new Date(),
         imageUrls: []
       };
       
       console.log('Creating new farm:', newFarm);
-      // Save to Firestore
-      const farmId = await saveFarmData(newFarm);
-      console.log('Farm created with ID:', farmId);
       
-      // Get the complete farm data
-      const savedFarm = await getFarmById(farmId);
+      let savedFarm;
+      if (auth?.currentUser) {
+        // User is authenticated - save to Firestore
+        const farmId = await saveFarmData(newFarm);
+        console.log('Farm created with ID:', farmId);
+        savedFarm = await getFarmById(farmId);
+      } else {
+        // Demo mode - create local farm with temporary ID
+        const tempId = `demo-farm-${Date.now()}`;
+        savedFarm = {
+          ...newFarm,
+          id: tempId,
+          userId: 'demo-user'
+        } as FarmData;
+        console.log('Demo farm created with ID:', tempId);
+      }
       
       if (savedFarm) {
         // Update the farms list
@@ -209,9 +202,9 @@ const Farm = () => {
         setSelectedFarm(savedFarm);
       
       toast({
-          title: "Farm Created",
-          description: "Your new farm has been created successfully.",
-        });
+        title: "Farm Created",
+        description: auth?.currentUser ? "Your new farm has been created successfully." : "Demo farm created. Sign in to save permanently.",
+      });
         
         // Reset the form
         setFarmDetailsForm({
@@ -448,15 +441,40 @@ const Farm = () => {
       setAnalyzing(true);
       
       // Show initial toast
-        toast({
+      toast({
         title: "Analysis Started",
         description: "AI analysis of your farm has started...",
       });
       
       console.log("Starting farm analysis for:", selectedFarm.id);
       
-      // Call the analyze farm function
-      const analyzedFarm = await analyzeFarmData(selectedFarm.id);
+      let analyzedFarm;
+      if (auth?.currentUser && !selectedFarm.id.startsWith('demo-farm-')) {
+        // Real user with saved farm - use Firestore analysis
+        analyzedFarm = await analyzeFarmData(selectedFarm.id);
+      } else {
+        // Demo mode or demo farm - generate mock analysis
+        analyzedFarm = {
+          ...selectedFarm,
+          analysis: {
+            soilHealth: Math.floor(Math.random() * 30) + 70, // 70-100%
+            cropHealth: Math.floor(Math.random() * 25) + 75, // 75-100%
+            waterManagement: Math.floor(Math.random() * 20) + 80, // 80-100%
+            pestRisk: Math.floor(Math.random() * 40) + 10, // 10-50%
+            overallScore: Math.floor(Math.random() * 20) + 80, // 80-100%
+            recommendations: [
+              "Consider implementing drip irrigation for better water efficiency",
+              "Regular soil testing recommended for optimal nutrient management",
+              "Monitor crop rotation to maintain soil health",
+              "Consider organic pest control methods"
+            ],
+            recommendedCrops: ["Tomatoes", "Peppers", "Lettuce", "Carrots"],
+            detailedAnalysis: "This is a demo analysis. Your farm shows good potential with some areas for improvement in water management and pest control. The soil quality appears to be in good condition."
+          },
+          lastAnalyzed: new Date()
+        };
+        console.log('Generated demo analysis for farm');
+      }
       
       if (analyzedFarm) {
         // Update the selected farm with analysis results
@@ -475,7 +493,7 @@ const Farm = () => {
         // Save to local storage as backup
         try {
           localStorage.setItem(`farm_analysis_${analyzedFarm.id}`, JSON.stringify(analyzedFarm.analysis));
-          console.log('Analysis also saved to local storage as backup');
+          console.log('Analysis saved to local storage');
         } catch (storageError) {
           console.error('Could not save to local storage:', storageError);
         }
@@ -567,7 +585,12 @@ const Farm = () => {
       <MainLayout>
       <div className="container mx-auto p-4">
         <div className="flex justify-between items-center mb-6">
-          <h1 className="text-2xl font-bold">Farm Management</h1>
+          <div>
+            <h1 className="text-2xl font-bold">Farm Management</h1>
+            {!auth?.currentUser && (
+              <p className="text-sm text-gray-600 mt-1">Demo Mode - Sign in to save your farms permanently</p>
+            )}
+          </div>
             <Button 
             className="bg-green-600 hover:bg-green-700"
             onClick={() => setShowNewFarmDialog(true)}

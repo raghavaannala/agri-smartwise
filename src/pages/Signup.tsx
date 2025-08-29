@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Loader2 } from 'lucide-react';
+import { Loader2, ArrowLeft } from 'lucide-react';
 import { toast } from 'sonner';
 
 const Signup = () => {
@@ -71,10 +71,26 @@ const Signup = () => {
     }
   };
 
+  const handleGoBack = () => {
+    navigate(-1); // Go back to previous page
+  };
+
   return (
     <div className="flex items-center justify-center min-h-screen bg-gray-50 px-4">
       <Card className="w-full max-w-md">
         <CardHeader className="space-y-1">
+          <div className="flex items-center justify-between mb-2">
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={handleGoBack}
+              className="flex items-center text-gray-600 hover:text-gray-800"
+            >
+              <ArrowLeft className="h-4 w-4 mr-1" />
+              Back
+            </Button>
+            <div className="text-xs text-gray-500">Optional</div>
+          </div>
           <CardTitle className="text-2xl font-bold text-center">Create an account</CardTitle>
           <CardDescription className="text-center">
             Enter your email below to create your account
@@ -168,6 +184,17 @@ const Signup = () => {
               Sign in
             </Link>
           </div>
+          <div className="text-xs text-center text-gray-500 mt-2">
+            You can also continue without creating an account to explore the app
+          </div>
+          <Button 
+            variant="link" 
+            size="sm" 
+            onClick={handleGoBack}
+            className="text-gray-600 hover:text-gray-800 text-xs"
+          >
+            Continue without signing up
+          </Button>
         </CardFooter>
       </Card>
     </div>
