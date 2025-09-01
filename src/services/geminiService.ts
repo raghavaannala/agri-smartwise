@@ -440,7 +440,7 @@ export const analyzeSoil = async (imageData: string): Promise<{
       - Texture (visible particles, clumping behavior)
       - Moisture level
       - Any visible organic matter, roots, or debris
-      
+      - check if any person is detected in the image if detected then return no soil present
       Return the analysis as valid JSON with the following structure:
       {
         "soilPresent": boolean,
