@@ -15,8 +15,15 @@ type LanguageContextType = {
 
 const languages: Language[] = [
   { name: 'English', code: 'en' },
-  { name: 'Telugu', code: 'te' },
-  { name: 'Hindi', code: 'hi' },
+  { name: 'हिंदी', code: 'hi' },
+  { name: 'తెలుగు', code: 'te' },
+  { name: 'தமிழ்', code: 'ta' },
+  { name: 'ಕನ್ನಡ', code: 'kn' },
+  { name: 'മലയാളം', code: 'ml' },
+  { name: 'বাংলা', code: 'bn' },
+  { name: 'ગુજરાતી', code: 'gu' },
+  { name: 'ਪੰਜਾਬੀ', code: 'pa' },
+  { name: 'मराठी', code: 'mr' },
 ];
 
 const LanguageContext = createContext<LanguageContextType | undefined>(undefined);

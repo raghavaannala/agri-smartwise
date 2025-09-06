@@ -286,5 +286,27 @@
     "processingError": "మీ అభ్యర్థనను ప్రాసెస్ చేయడంలో లోపం ఉంది. దయచేసి మళ్లీ ప్రయత్నించండి.",
     "loginPrompt": "వ్యక్తిగతీకరించిన సలహాల కోసం దయచేసి లాగిన్ చేయండి.",
     "respondIn": "తెలుగులో సమాధానం ఇవ్వండి"
-  }
+  },
+  "sidebar": {
+    "categories": {
+      "main": "ప్రధాన",
+      "tools": "సాధనాలు",
+      "info": "సమాచారం"
+    },
+    "featured": "ప్రత్యేకం",
+    "meetTeam": "మా బృందాన్ని కలవండి"
+  },
+  "selectLanguage": "భాష ఎంచుకోండి",
+  "notifications": "నోటిఫికేషన్లు",
+  "weatherForecast": "వాతావరణ సూచన",
+  "rainExpected": "వర్షం అంచనా",
+  "marketPrices": "మార్కెట్ ధరలు",
+  "priceIncrease": "ధర పెరుగుదల",
+  "diseaseDetection": "వ్యాధి గుర్తింపు",
+  "fungalInfection": "ఫంగల్ ఇన్ఫెక్షన్",
+  "myAccount": "నా ఖాతా",
+  "profile": "ప్రొఫైల్",
+  "settings": "సెట్టింగ్‌లు",
+  "farmDetails": "పొలం వివరాలు",
+  "logout": "లాగౌట్"
 }
