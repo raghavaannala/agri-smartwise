@@ -7,6 +7,7 @@ import {
   X, 
   Volume2, 
   VolumeX, 
+  Square,
   MessageSquare,
   Bot,
   User,
@@ -206,7 +207,7 @@ export const VoiceAssistant: React.FC = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputText, setInputText] = useState('');
   const [isListening, setIsListening] = useState(false);
-  const [isSpeaking, setIsSpeaking] = useState(true);
+  const [isSpeaking, setIsSpeaking] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
   const [currentLanguage, setCurrentLanguage] = useState<Language>(SUPPORTED_LANGUAGES[0]);
   const [showLanguageSelector, setShowLanguageSelector] = useState(false);
@@ -317,7 +318,7 @@ export const VoiceAssistant: React.FC = () => {
     const speechLanguageMap: { [key: string]: string } = {
       'en': 'en-US',
       'hi': 'hi-IN',
-      'or': 'hi-IN', // Fallback to Hindi as Odia might not be supported
+      'or': 'or-IN', // Try Odia first, will fallback if not available
       'bn': 'bn-IN',
       'te': 'te-IN',
       'ta': 'ta-IN',
@@ -327,12 +328,56 @@ export const VoiceAssistant: React.FC = () => {
     return speechLanguageMap[langCode] || 'en-US';
   };
 
+  // Debug function to log available voices
+  const logAvailableVoices = () => {
+    if (!synthesisRef.current) return;
+    const voices = synthesisRef.current.getVoices();
+    console.log('=== AVAILABLE VOICES DEBUG ===');
+    console.log('Total voices found:', voices.length);
+    voices.forEach((voice, index) => {
+      console.log(`${index + 1}. ${voice.name} (${voice.lang}) - Local: ${voice.localService}`);
+    });
+    
+    // Check for specific languages we support
+    const supportedLangs = ['en', 'hi', 'te', 'ta', 'bn', 'mr', 'gu', 'or'];
+    supportedLangs.forEach(lang => {
+      const matchingVoices = voices.filter(v => v.lang.toLowerCase().startsWith(lang));
+      console.log(`Voices for ${lang}:`, matchingVoices.map(v => `${v.name} (${v.lang})`));
+    });
+    console.log('=== END VOICES DEBUG ===');
+  };
+
+  // Test speech synthesis for a language
+  const testSpeechForLanguage = (langCode: string, testText: string = 'Test') => {
+    if (!synthesisRef.current) return;
+    
+    console.log(`\n🧪 TESTING SPEECH FOR ${langCode.toUpperCase()}`);
+    const utterance = new SpeechSynthesisUtterance(testText);
+    const voice = getVoiceForLanguage(langCode);
+    
+    if (voice) {
+      utterance.voice = voice;
+      utterance.lang = voice.lang;
+    } else {
+      utterance.lang = getSpeechLanguageCode(langCode);
+    }
+    
+    utterance.volume = 0.1; // Low volume for testing
+    utterance.rate = 2.0; // Fast for testing
+    
+    utterance.onstart = () => console.log(`✅ ${langCode} speech test started`);
+    utterance.onend = () => console.log(`✅ ${langCode} speech test completed`);
+    utterance.onerror = (e) => console.error(`❌ ${langCode} speech test failed:`, e.error);
+    
+    synthesisRef.current.speak(utterance);
+  };
+
   // Get proper language code for speech recognition
   const getRecognitionLanguageCode = (langCode: string): string => {
     const recognitionLanguageMap: { [key: string]: string } = {
       'en': 'en-US',
       'hi': 'hi-IN',
-      'or': 'hi-IN', // Fallback to Hindi
+      'or': 'or-IN', // Try Odia first
       'bn': 'bn-IN',
       'te': 'te-IN',
       'ta': 'ta-IN',
@@ -346,6 +391,31 @@ export const VoiceAssistant: React.FC = () => {
   useEffect(() => {
     if (typeof window !== 'undefined' && window.speechSynthesis) {
       synthesisRef.current = window.speechSynthesis;
+      
+      // Load voices and log them for debugging
+      const loadVoices = () => {
+        const voices = synthesisRef.current?.getVoices() || [];
+        if (voices.length > 0) {
+          logAvailableVoices();
+          
+          // Test speech synthesis for all supported languages
+          console.log('\n🧪 TESTING SPEECH SYNTHESIS FOR ALL LANGUAGES...');
+          const testLanguages = ['en', 'hi', 'te', 'ta', 'bn', 'mr', 'gu', 'or'];
+          testLanguages.forEach((lang, index) => {
+            setTimeout(() => {
+              testSpeechForLanguage(lang, `${lang} test`);
+            }, index * 500); // Stagger tests
+          });
+        }
+      };
+      
+      // Try to load voices immediately
+      loadVoices();
+      
+      // Also listen for voices changed event (some browsers load voices asynchronously)
+      if (synthesisRef.current) {
+        synthesisRef.current.onvoiceschanged = loadVoices;
+      }
     }
     
     // Initialize Gemini client
@@ -556,8 +626,8 @@ export const VoiceAssistant: React.FC = () => {
 
       setMessages(prev => [...prev, botMessage]);
       
-      // Speak the response if speech is enabled
-      if (isSpeaking && response) {
+      // Speak the response if speech is enabled (check if speech synthesis is available)
+      if (response) {
         speakText(response);
       }
     } catch (error) {
@@ -577,6 +647,90 @@ export const VoiceAssistant: React.FC = () => {
     }
   }, [currentLanguage, handleNavigation, generateAIResponse, isSpeaking]);
 
+  // Get available voices for current language
+  const getVoiceForLanguage = (langCode: string) => {
+    if (!synthesisRef.current) {
+      console.warn('Speech synthesis not available');
+      return null;
+    }
+    
+    const voices = synthesisRef.current.getVoices();
+    console.log(`\n=== VOICE SELECTION FOR ${langCode.toUpperCase()} ===`);
+    console.log('Available voices count:', voices.length);
+    
+    if (voices.length === 0) {
+      console.warn('No voices available yet');
+      return null;
+    }
+    
+    const targetLang = getSpeechLanguageCode(langCode);
+    console.log('Target language code:', targetLang);
+    
+    // First try to find exact language match
+    let voice = voices.find(v => v.lang.toLowerCase() === targetLang.toLowerCase());
+    console.log('Exact match found:', voice ? `${voice.name} (${voice.lang})` : 'None');
+    
+    // If no exact match, try language prefix (e.g., 'hi' from 'hi-IN')
+    if (!voice) {
+      const langPrefix = targetLang.split('-')[0].toLowerCase();
+      voice = voices.find(v => v.lang.toLowerCase().startsWith(langPrefix));
+      console.log('Prefix match found:', voice ? `${voice.name} (${voice.lang})` : 'None');
+    }
+    
+    // Try case-insensitive broader search
+    if (!voice) {
+      const langPrefix = targetLang.split('-')[0].toLowerCase();
+      voice = voices.find(v => {
+        const vLang = v.lang.toLowerCase();
+        return vLang.includes(langPrefix) || vLang.includes(langCode.toLowerCase());
+      });
+      console.log('Broader search found:', voice ? `${voice.name} (${voice.lang})` : 'None');
+    }
+    
+    // Try alternative language codes for Indian languages
+    if (!voice) {
+      console.log('Trying alternative language codes...');
+      const alternativeMap: { [key: string]: string[] } = {
+        'te': ['te-IN', 'te', 'tel'], // Telugu alternatives
+        'ta': ['ta-IN', 'ta', 'tam'], // Tamil alternatives
+        'bn': ['bn-IN', 'bn-BD', 'bn', 'ben'], // Bengali alternatives
+        'mr': ['mr-IN', 'mr', 'mar'], // Marathi alternatives
+        'gu': ['gu-IN', 'gu', 'guj'], // Gujarati alternatives
+        'or': ['or-IN', 'or', 'ori', 'ory'], // Odia alternatives
+        'hi': ['hi-IN', 'hi', 'hin'] // Hindi alternatives
+      };
+      
+      const alternatives = alternativeMap[langCode] || [];
+      for (const altLang of alternatives) {
+        voice = voices.find(v => 
+          v.lang.toLowerCase() === altLang.toLowerCase() || 
+          v.lang.toLowerCase().startsWith(altLang.toLowerCase())
+        );
+        if (voice) {
+          console.log(`Alternative voice found for ${altLang}:`, `${voice.name} (${voice.lang})`);
+          break;
+        }
+      }
+    }
+    
+    // Only fallback to English if absolutely no other option
+    if (!voice && voices.length > 0) {
+      // Use default system voice as last resort
+      voice = voices[0];
+      console.log('Using default system voice:', voice ? `${voice.name} (${voice.lang})` : 'None');
+    }
+    
+    // Log the final selected voice
+    if (voice) {
+      console.log(`✅ SELECTED VOICE: ${voice.name} (${voice.lang})`);
+    } else {
+      console.error(`❌ NO VOICE FOUND for language: ${langCode}`);
+    }
+    console.log('=== END VOICE SELECTION ===\n');
+    
+    return voice;
+  };
+
   // Speech synthesis
   const speakText = useCallback((text: string) => {
     if (!synthesisRef.current || !text) return;
@@ -585,17 +739,108 @@ export const VoiceAssistant: React.FC = () => {
     const cleanText = cleanTextForSpeech(text);
     if (!cleanText.trim()) return;
 
+    // Cancel any existing speech
     synthesisRef.current.cancel();
-    const utterance = new SpeechSynthesisUtterance(cleanText);
-    utterance.rate = 0.8;
-    utterance.pitch = 1.0;
-    utterance.volume = 1.0;
-    utterance.lang = getSpeechLanguageCode(currentLanguage.code);
     
-    utterance.onend = () => setIsSpeaking(false);
-    utterance.onerror = () => setIsSpeaking(false);
+    // Small delay to ensure cancellation is processed
+    setTimeout(() => {
     
-    synthesisRef.current.speak(utterance);
+    // Wait for voices to be loaded
+    const speak = () => {
+      console.log(`\n🔊 ATTEMPTING TO SPEAK: "${cleanText.substring(0, 50)}..."`);
+      console.log('Current language:', currentLanguage.code, currentLanguage.name);
+      
+      const utterance = new SpeechSynthesisUtterance(cleanText);
+      const voice = getVoiceForLanguage(currentLanguage.code);
+      
+      // Always set the target language first
+      const targetLanguage = getSpeechLanguageCode(currentLanguage.code);
+      utterance.lang = targetLanguage;
+      
+      if (voice) {
+        console.log('✅ Using selected voice:', voice.name, voice.lang);
+        utterance.voice = voice;
+        // Only override language if the voice language is more specific
+        if (voice.lang.toLowerCase().startsWith(currentLanguage.code.toLowerCase())) {
+          utterance.lang = voice.lang;
+        }
+      } else {
+        console.log('⚠️ No specific voice found, using language code:', targetLanguage);
+      }
+      
+      console.log('🌐 Final language setting:', utterance.lang);
+      
+      utterance.rate = 0.8;
+      utterance.pitch = 1.0;
+      utterance.volume = 1.0;
+      
+      utterance.onstart = () => {
+        console.log('🎤 Speech started with language:', utterance.lang);
+        // Don't set speaking state here as it's already set below
+      };
+      
+      utterance.onend = () => {
+        console.log('🎤 Speech ended naturally');
+        // Use setTimeout to ensure state update happens after all events
+        setTimeout(() => setIsSpeaking(false), 50);
+      };
+      
+      utterance.onerror = (event) => {
+        console.error('❌ Speech synthesis error:', event.error);
+        console.error('Error details:', event);
+        // Use setTimeout to ensure state update happens after all events
+        setTimeout(() => setIsSpeaking(false), 50);
+      };
+      
+      utterance.onpause = () => {
+        console.log('⏸️ Speech paused');
+      };
+      
+      utterance.onresume = () => {
+        console.log('▶️ Speech resumed');
+      };
+      
+      console.log('📢 Final utterance config:', {
+        text: cleanText.substring(0, 50) + '...',
+        lang: utterance.lang,
+        voice: utterance.voice?.name || 'Default',
+        rate: utterance.rate
+      });
+      
+      // Set speaking state before starting speech
+      setIsSpeaking(true);
+      console.log('🔊 Starting speech synthesis...');
+      synthesisRef.current?.speak(utterance);
+    };
+    
+      // Check if voices are loaded
+      const voices = synthesisRef.current?.getVoices() || [];
+      console.log('Voices loaded:', voices.length > 0 ? 'Yes' : 'No');
+      
+      if (voices.length === 0) {
+        console.log('⏳ Waiting for voices to load...');
+        // Wait for voices to load
+        if (synthesisRef.current) {
+          synthesisRef.current.onvoiceschanged = () => {
+            console.log('🔄 Voices loaded, retrying speech...');
+            speak();
+            if (synthesisRef.current) {
+              synthesisRef.current.onvoiceschanged = null;
+            }
+          };
+        }
+        
+        // Fallback: try speaking anyway after a short delay
+        setTimeout(() => {
+          if (synthesisRef.current && synthesisRef.current.getVoices().length === 0) {
+            console.log('⚠️ Timeout waiting for voices, attempting speech anyway...');
+            speak();
+          }
+        }, 1000);
+      } else {
+        speak();
+      }
+    }, 100); // Small delay to prevent conflicts
   }, [currentLanguage]);
 
   // Speech recognition
@@ -641,6 +886,28 @@ export const VoiceAssistant: React.FC = () => {
     }
     setIsListening(false);
   }, []);
+
+  // Stop speech synthesis
+  const stopSpeaking = useCallback(() => {
+    if (synthesisRef.current) {
+      synthesisRef.current.cancel();
+      console.log('🛑 Speech synthesis stopped by user');
+    }
+    setIsSpeaking(false);
+  }, []);
+
+  // Toggle speech on/off
+  const toggleSpeech = useCallback(() => {
+    const newSpeakingState = !isSpeaking;
+    setIsSpeaking(newSpeakingState);
+    
+    if (!newSpeakingState && synthesisRef.current) {
+      synthesisRef.current.cancel();
+      console.log('🔇 Speech disabled by user');
+    }
+    
+    console.log('🔊 Speech', newSpeakingState ? 'enabled' : 'disabled');
+  }, [isSpeaking]);
 
   // Handle form submission
   const handleSubmit = (e: React.FormEvent) => {
@@ -1242,6 +1509,18 @@ export const VoiceAssistant: React.FC = () => {
                   >
                     {isListening ? <MicOff size={20} /> : <Mic size={20} />}
                   </button>
+                  
+                  {/* Stop Speech Button */}
+                  {isSpeaking && (
+                    <button
+                      type="button"
+                      onClick={stopSpeaking}
+                      className="p-3 rounded-xl bg-red-500 hover:bg-red-600 text-white transition-colors"
+                      title={currentLanguage.code === 'hi' ? 'बोलना बंद करें' : 'Stop Speaking'}
+                    >
+                      <Square size={20} />
+                    </button>
+                  )}
                   
                   <button
                     type="submit"
