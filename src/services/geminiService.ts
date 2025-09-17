@@ -19,64 +19,94 @@ export const initGeminiClient = async (apiKey: string): Promise<boolean> => {
     console.log('Initializing Gemini client with API key...');
     const genAI = new GoogleGenerativeAI(apiKey);
     
-    // Check connectivity with a simple ping request
-    const pingModel = genAI.getGenerativeModel({ 
-      model: "gemini-2.0-flash-lite",
-      generationConfig: {
-        maxOutputTokens: 10,
-      },
-    });
+    // Try multiple models in order of preference (high-end to standard)
+    const modelOptions = [
+      "gemini-2.5-pro",
+      "gemini-2.0-pro", 
+      "gemini-2.0-flash",
+      "gemini-1.5-pro",
+      "gemini-1.5-flash",
+      "gemini-2.0-flash-lite"
+    ];
     
-    // Try a simple ping to verify connectivity
-    const pingPromise = pingModel.generateContent("ping test")
-      .then(result => {
-        const text = result.response.text();
-        console.log("Gemini API connectivity test successful:", text);
-        return text && text.length > 0;
-      })
-      .catch(error => {
-        console.error("Gemini API connectivity test failed:", error);
-        throw error;
-      });
+    let modelInitialized = false;
+    let lastError: any = null;
     
-    // Set a timeout for the ping test
-    const timeoutPromise = new Promise<never>((_, reject) => {
-      setTimeout(() => reject(new Error("Gemini API connectivity test timed out")), 5000);
-    });
+    for (const modelName of modelOptions) {
+      try {
+        console.log(`Attempting to initialize model: ${modelName}`);
+        
+        // Check connectivity with a simple ping request
+        const pingModel = genAI.getGenerativeModel({ 
+          model: modelName,
+          generationConfig: {
+            maxOutputTokens: 10,
+          },
+        });
+        
+        // Try a simple ping to verify connectivity
+        const pingPromise = pingModel.generateContent("test")
+          .then(result => {
+            const text = result.response.text();
+            console.log(`${modelName} API connectivity test successful:`, text);
+            return text && text.length > 0;
+          })
+          .catch(error => {
+            console.error(`${modelName} API connectivity test failed:`, error);
+            throw error;
+          });
+        
+        // Set a timeout for the ping test
+        const timeoutPromise = new Promise<never>((_, reject) => {
+          setTimeout(() => reject(new Error(`${modelName} API connectivity test timed out`)), 8000);
+        });
+        
+        // Race the ping against the timeout
+        await Promise.race([pingPromise, timeoutPromise]);
+        
+        // If we get here, the ping was successful, so initialize the full model
+        geminiModel = genAI.getGenerativeModel({ 
+          model: modelName,
+          generationConfig: {
+            temperature: 0.4,
+            topP: 0.8,
+            topK: 40,
+            maxOutputTokens: 2048,
+          },
+          safetySettings: [
+            {
+              category: HarmCategory.HARM_CATEGORY_HARASSMENT,
+              threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
+            },
+            {
+              category: HarmCategory.HARM_CATEGORY_HATE_SPEECH,
+              threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
+            },
+            {
+              category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT,
+              threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
+            },
+            {
+              category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT,
+              threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
+            },
+          ],
+        });
+        
+        console.log(`Gemini client initialized successfully with model: ${modelName}`);
+        modelInitialized = true;
+        break;
+      } catch (error) {
+        console.warn(`Failed to initialize ${modelName}:`, error);
+        lastError = error;
+        continue;
+      }
+    }
     
-    // Race the ping against the timeout
-    await Promise.race([pingPromise, timeoutPromise]);
+    if (!modelInitialized) {
+      throw lastError || new Error('All Gemini models failed to initialize');
+    }
     
-    // If we get here, the ping was successful, so initialize the full model
-    geminiModel = genAI.getGenerativeModel({ 
-      model: "gemini-2.0-flash-lite",
-      generationConfig: {
-        temperature: 0.4,
-        topP: 0.8,
-        topK: 40,
-        maxOutputTokens: 2048,
-      },
-      safetySettings: [
-        {
-          category: HarmCategory.HARM_CATEGORY_HARASSMENT,
-          threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
-        },
-        {
-          category: HarmCategory.HARM_CATEGORY_HATE_SPEECH,
-          threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
-        },
-        {
-          category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT,
-          threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
-        },
-        {
-          category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT,
-          threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
-        },
-      ],
-    });
-    
-    console.log('Gemini client initialized successfully with model: gemini-2.0-flash-lite');
     return true;
   } catch (error) {
     console.error('Failed to initialize Gemini client:', error);
@@ -258,6 +288,183 @@ export const analyzeImage = async (imageData: string, prompt: string): Promise<s
 };
 
 /**
+ * Analyze soil from image
+ * @param imageData - Base64 encoded image data
+ * @returns Soil analysis result
+ */
+export const analyzeSoil = async (imageData: string): Promise<any> => {
+  if (!geminiModel) {
+    console.error('Gemini client not initialized');
+    return {
+      soilPresent: false,
+      soilType: 'Service not available',
+      fertility: 'Medium',
+      phLevel: '7.0',
+      recommendations: 'Please try again later or refresh the page.',
+      suitableCrops: ['Service unavailable'],
+      confidenceScore: 0,
+      nutrients: { nitrogen: 0, phosphorus: 0, potassium: 0, organicMatter: 0, sulfur: 0 },
+      properties: { ph: 7.0, texture: 'Unknown', waterRetention: 0, drainage: 'Unknown' }
+    };
+  }
+
+  const prompt = `
+    Analyze this soil image and provide detailed soil analysis. If no soil is visible, set soilPresent to false.
+    
+    Return ONLY this JSON structure with NO additional text:
+    {
+      "soilPresent": true,
+      "soilType": "Clay Loam",
+      "fertility": "Medium",
+      "phLevel": "6.5-7.0",
+      "recommendations": "Add organic matter and ensure proper drainage",
+      "suitableCrops": ["wheat", "corn", "soybeans"],
+      "confidenceScore": 7,
+      "nutrients": {
+        "nitrogen": 35,
+        "phosphorus": 28,
+        "potassium": 42,
+        "organicMatter": 15,
+        "sulfur": 10
+      },
+      "properties": {
+        "ph": 6.8,
+        "texture": "Clay Loam",
+        "waterRetention": 65,
+        "drainage": "Good"
+      }
+    }
+    
+    Rules:
+    - soilPresent: boolean (false if no soil visible)
+    - fertility: "Low", "Medium", or "High"
+    - confidenceScore: number 1-10
+    - All nutrient values: numbers 0-100
+    - ph: number 0-14
+    - waterRetention: number 0-100
+    - drainage: "Poor", "Moderate", or "Good"
+    - Return ONLY the JSON object
+  `;
+
+  let retryCount = 0;
+  const maxRetries = 3;
+
+  while (retryCount <= maxRetries) {
+    try {
+      console.log(`Soil analysis attempt ${retryCount + 1}/${maxRetries + 1}`);
+      
+      const mimeType = imageData.startsWith('data:image/png') ? 'image/png' : 
+                       imageData.startsWith('data:image/jpeg') ? 'image/jpeg' : 
+                       imageData.startsWith('data:image/jpg') ? 'image/jpeg' : 'image/png';
+      
+      const imagePart = {
+        inlineData: {
+          data: imageData.split(',')[1],
+          mimeType: mimeType
+        }
+      };
+
+      const result = await geminiModel.generateContent([prompt, imagePart], {
+        generationConfig: {
+          temperature: 0.2,
+          topP: 0.8,
+          topK: 40,
+          maxOutputTokens: 1024,
+        },
+      });
+      
+      const response = result.response;
+      let text = response.text();
+      
+      if (!text || text.trim().length === 0) {
+        throw new Error('Empty response from Gemini');
+      }
+      
+      console.log('Soil analysis response length:', text.length);
+      
+      // Clean up the response
+      text = text.trim();
+      text = text.replace(/^```json\s*/i, '').replace(/\s*```$/i, '');
+      text = text.replace(/^```\s*/i, '').replace(/\s*```$/i, '');
+      
+      // Find JSON object boundaries
+      const startIndex = text.indexOf('{');
+      const lastIndex = text.lastIndexOf('}');
+      
+      if (startIndex === -1 || lastIndex === -1 || startIndex >= lastIndex) {
+        throw new Error('No valid JSON object found in response');
+      }
+      
+      // Extract the JSON part
+      const jsonText = text.substring(startIndex, lastIndex + 1);
+      
+      // Validate basic JSON structure
+      if (!jsonText.includes('"soilPresent"') || !jsonText.includes('"soilType"')) {
+        throw new Error('Response missing required soil fields');
+      }
+      
+      // Parse and validate
+      const analysisResult = JSON.parse(jsonText);
+      
+      // Validate required fields
+      if (typeof analysisResult.soilPresent !== 'boolean') {
+        throw new Error('Invalid soil analysis structure');
+      }
+      
+      // Normalize and validate fields
+      const validatedResult = {
+        soilPresent: Boolean(analysisResult.soilPresent),
+        soilType: String(analysisResult.soilType || 'Loamy Soil').trim(),
+        fertility: ['Low', 'Medium', 'High'].includes(analysisResult.fertility) ? analysisResult.fertility : 'Medium',
+        phLevel: String(analysisResult.phLevel || '6.5-7.0').trim(),
+        recommendations: String(analysisResult.recommendations || 'Regular soil testing recommended for optimal crop management.').trim(),
+        suitableCrops: Array.isArray(analysisResult.suitableCrops) ? analysisResult.suitableCrops : ['wheat', 'corn', 'rice'],
+        confidenceScore: Math.max(1, Math.min(10, Number(analysisResult.confidenceScore) || 6)),
+        nutrients: {
+          nitrogen: Math.max(0, Math.min(100, Number(analysisResult.nutrients?.nitrogen) || 35)),
+          phosphorus: Math.max(0, Math.min(100, Number(analysisResult.nutrients?.phosphorus) || 28)),
+          potassium: Math.max(0, Math.min(100, Number(analysisResult.nutrients?.potassium) || 42)),
+          organicMatter: Math.max(0, Math.min(100, Number(analysisResult.nutrients?.organicMatter) || 15)),
+          sulfur: Math.max(0, Math.min(100, Number(analysisResult.nutrients?.sulfur) || 10))
+        },
+        properties: {
+          ph: Math.max(0, Math.min(14, Number(analysisResult.properties?.ph) || 6.8)),
+          texture: String(analysisResult.properties?.texture || 'Loamy').trim(),
+          waterRetention: Math.max(0, Math.min(100, Number(analysisResult.properties?.waterRetention) || 65)),
+          drainage: ['Poor', 'Moderate', 'Good'].includes(analysisResult.properties?.drainage) ? analysisResult.properties.drainage : 'Good'
+        }
+      };
+      
+      console.log('Soil analysis completed successfully:', validatedResult.soilType);
+      return validatedResult;
+      
+    } catch (error: any) {
+      console.error(`Soil analysis attempt ${retryCount + 1} failed:`, error.message);
+      
+      if (retryCount >= maxRetries) {
+        console.error('All soil analysis attempts failed');
+        return {
+          soilPresent: true,
+          soilType: 'Analysis Failed',
+          fertility: 'Medium',
+          phLevel: '6.5-7.0',
+          recommendations: 'Unable to analyze soil image. Please try again with a clearer image showing soil surface.',
+          suitableCrops: ['Analysis incomplete'],
+          confidenceScore: 3,
+          nutrients: { nitrogen: 30, phosphorus: 25, potassium: 35, organicMatter: 12, sulfur: 8 },
+          properties: { ph: 6.8, texture: 'Unknown', waterRetention: 50, drainage: 'Moderate' }
+        };
+      }
+      
+      // Wait before retry with exponential backoff
+      const delay = Math.min(1000 * Math.pow(2, retryCount), 5000);
+      await new Promise(resolve => setTimeout(resolve, delay));
+      retryCount++;
+    }
+  }
+};
+
+/**
  * Analyze crop disease from an image
  * @param imageData - The base64 encoded image data
  * @returns Structured analysis of crop disease
@@ -269,434 +476,139 @@ export const analyzeCropDisease = async (imageData: string): Promise<{
   severity: 'Low' | 'Medium' | 'High';
   details: string;
 }> => {
+  if (!geminiModel) {
+    console.error('Gemini client not initialized');
+    return {
+      disease: 'Service not available',
+      confidence: 0,
+      treatment: 'Please try again later or refresh the page.',
+      severity: 'Unknown',
+      details: 'AI service is not properly initialized.'
+    };
+  }
+
   const prompt = `
     Analyze this plant image and identify any disease or condition affecting the plant.
     
-    You are a professional plant pathologist with extensive expertise in identifying all types of plant diseases across a wide range of crops.
+    You are a professional plant pathologist. Provide a comprehensive assessment in JSON format ONLY.
     
-    Provide a comprehensive and detailed assessment in JSON format with the following fields:
+    Return this exact JSON structure with NO additional text or formatting:
     {
-      "disease": "Specific disease name (use scientific name if possible alongside common name)",
-      "confidence": confidence percentage as a number between 0-100,
-      "treatment": "Detailed treatment recommendations including chemical and organic options",
-      "severity": "Low", "Medium", or "High",
-      "details": "Comprehensive description of the disease including symptoms, causal organism, conditions that favor development, and potential crop impact"
+      "disease": "Specific disease name",
+      "confidence": 85,
+      "treatment": "Detailed treatment recommendations",
+      "severity": "Low",
+      "details": "Disease description and symptoms"
     }
     
-    Identification should be extremely precise and accurate. Consider ALL possible plant diseases and conditions:
-    - Fungal diseases (rusts, mildews, blights, leaf spots, etc.)
-    - Bacterial diseases (bacterial leaf spot, cankers, wilts, etc.)
-    - Viral diseases (mosaic viruses, yellowing viruses, etc.)
-    - Nematode damage
-    - Nutrient deficiencies or toxicities (N, P, K, Ca, Mg, S, Fe, Mn, B, etc.)
-    - Physiological disorders (blossom end rot, cracking, etc.)
-    - Environmental stress (drought, frost, heat, etc.)
-    - Herbicide damage or phytotoxicity
-    - Pest damage indicators (specific to pest types)
-    
-    Provide extremely specific disease names rather than general categories.
-    For example, instead of just "leaf spot," identify "Cercospora leaf spot," "Alternaria leaf spot," etc.
-    
-    For treatment options, include specific product types, active ingredients, application timing, and integrated management approaches.
-    If you cannot identify a specific disease with high confidence, list the most likely possibilities in order of probability.
-    
-    Base your analysis solely on visual symptoms present in the image. Be scientifically accurate.
+    Rules:
+    - confidence: number between 0-100
+    - severity: must be exactly "Low", "Medium", or "High"
+    - Keep treatment and details concise but informative
+    - NO markdown, NO code blocks, NO extra text
+    - Return ONLY the JSON object
   `;
-  
-  try {
-    const result = await analyzeImage(imageData, prompt);
-    console.log('Raw disease analysis response:', result);
-    
-    // Extract JSON from the response, handling potential formatting issues
-    let jsonStr = result;
-    
-    // Remove any markdown code blocks if present
-    jsonStr = jsonStr.replace(/```json|```/g, '').trim();
-    
-    // Try to find JSON object in the text if it's not properly formatted
-    const jsonMatch = jsonStr.match(/\{[\s\S]*\}/);
-    if (jsonMatch) {
-      jsonStr = jsonMatch[0];
-    }
-    
+
+  let retryCount = 0;
+  const maxRetries = 3;
+
+  while (retryCount <= maxRetries) {
     try {
-      const parsedResult = JSON.parse(jsonStr);
+      console.log(`Disease analysis attempt ${retryCount + 1}/${maxRetries + 1}`);
       
-      // Validate and normalize the response fields
-      const disease = parsedResult.disease || 'Unknown Disease';
-      let confidence = parsedResult.confidence;
+      const mimeType = imageData.startsWith('data:image/png') ? 'image/png' : 
+                       imageData.startsWith('data:image/jpeg') ? 'image/jpeg' : 
+                       imageData.startsWith('data:image/jpg') ? 'image/jpeg' : 'image/png';
       
-      // Ensure confidence is a number between 0-100
-      if (typeof confidence !== 'number' || isNaN(confidence)) {
-        confidence = 70; // Default confidence if not provided or invalid
-      } else {
-        confidence = Math.max(0, Math.min(100, confidence)); // Clamp between 0-100
-      }
-      
-      // Normalize severity to one of the accepted values
-      let severity: 'Low' | 'Medium' | 'High' = 'Medium';
-      if (parsedResult.severity) {
-        const severityStr = parsedResult.severity.toString().trim().toLowerCase();
-        if (severityStr === 'low') severity = 'Low';
-        else if (severityStr === 'high') severity = 'High';
-        else severity = 'Medium';
-      }
-      
-      return {
-        disease,
-        confidence,
-        treatment: parsedResult.treatment || 'No treatment information available',
-        severity,
-        details: parsedResult.details || ''
+      const imagePart = {
+        inlineData: {
+          data: imageData.split(',')[1],
+          mimeType: mimeType
+        }
       };
-    } catch (parseError) {
-      console.error('Error parsing Gemini response:', parseError);
-      console.error('Raw response:', result);
+
+      const result = await geminiModel.generateContent([prompt, imagePart], {
+        generationConfig: {
+          temperature: 0.3,
+          topP: 0.8,
+          topK: 40,
+          maxOutputTokens: 1024,
+        },
+      });
       
-      // Try to extract information from non-JSON response using more robust regex
-      const diseaseMatch = result.match(/disease[:\s]+"?([^"\n.,]+)"?/i) || result.match(/disease[:\s]+([^\n.,]+)/i);
-      const confidenceMatch = result.match(/confidence[:\s]+"?(\d+)"?/i) || result.match(/confidence[:\s]+(\d+)/i);
-      const severityMatch = result.match(/severity[:\s]+"?(Low|Medium|High)"?/i) || result.match(/severity[:\s]+(Low|Medium|High)/i);
-      const treatmentMatch = result.match(/treatment[:\s]+"?([^"]+)"?/i) || result.match(/treatment[:\s]+([^\n]+)/i);
-      const detailsMatch = result.match(/details[:\s]+"?([^"]+)"?/i) || result.match(/details[:\s]+([^\n]+)/i);
+      const response = result.response;
+      let text = response.text();
       
-      // If disease was extracted, use that information
-      if (diseaseMatch) {
+      if (!text || text.trim().length === 0) {
+        throw new Error('Empty response from Gemini');
+      }
+      
+      console.log('Raw response length:', text.length);
+      
+      // Clean up the response
+      text = text.trim();
+      
+      // Remove any markdown formatting
+      text = text.replace(/^```json\s*/i, '').replace(/\s*```$/i, '');
+      text = text.replace(/^```\s*/i, '').replace(/\s*```$/i, '');
+      
+      // Find JSON object boundaries
+      const startIndex = text.indexOf('{');
+      const lastIndex = text.lastIndexOf('}');
+      
+      if (startIndex === -1 || lastIndex === -1 || startIndex >= lastIndex) {
+        throw new Error('No valid JSON object found in response');
+      }
+      
+      // Extract the JSON part
+      const jsonText = text.substring(startIndex, lastIndex + 1);
+      
+      // Validate basic JSON structure
+      if (!jsonText.includes('"disease"') || !jsonText.includes('"confidence"')) {
+        throw new Error('Response missing required fields');
+      }
+      
+      // Parse and validate
+      const analysisResult = JSON.parse(jsonText);
+      
+      // Validate required fields
+      if (!analysisResult.disease || typeof analysisResult.confidence !== 'number') {
+        throw new Error('Invalid response structure');
+      }
+      
+      // Normalize and validate fields
+      const validatedResult = {
+        disease: String(analysisResult.disease).trim(),
+        confidence: Math.max(0, Math.min(100, Number(analysisResult.confidence) || 50)),
+        treatment: String(analysisResult.treatment || 'Consult with agricultural expert for treatment recommendations.').trim(),
+        severity: ['Low', 'Medium', 'High'].includes(analysisResult.severity) ? analysisResult.severity : 'Medium',
+        details: String(analysisResult.details || 'Disease analysis completed.').trim()
+      };
+      
+      console.log('Disease analysis completed successfully:', validatedResult.disease);
+      return validatedResult;
+      
+    } catch (error: any) {
+      console.error(`Attempt ${retryCount + 1} failed:`, error.message);
+      
+      if (retryCount >= maxRetries) {
+        console.error('All disease analysis attempts failed');
         return {
-          disease: diseaseMatch[1].trim(),
-          confidence: confidenceMatch ? parseInt(confidenceMatch[1]) : 70,
-          treatment: treatmentMatch ? treatmentMatch[1].trim() : 'Apply appropriate fungicide or treatment based on the disease. Consult a local agricultural extension for specific recommendations.',
-          severity: (severityMatch ? severityMatch[1] as 'Low' | 'Medium' | 'High' : 'Medium'),
-          details: detailsMatch ? detailsMatch[1].trim() : 'A plant disease detected in the analyzed image. Further inspection may be needed for confirmation.'
+          disease: 'Analysis Failed',
+          confidence: 0,
+          treatment: 'Unable to analyze the image. Please try again with a clearer image showing plant symptoms.',
+          severity: 'Medium',
+          details: 'The AI analysis could not be completed. This may be due to image quality, lighting, or service limitations.'
         };
       }
       
-      // If we couldn't extract disease info, return a generic response indicating analysis failure
-      return {
-        disease: "Analysis Inconclusive",
-        confidence: 40,
-        treatment: "Based on the unclear results, we recommend consulting with a local agricultural extension office or plant pathologist. Bring a physical sample or clearer images for more accurate identification.",
-        severity: "Medium",
-        details: "The AI was unable to conclusively identify a specific disease from this image. This may be due to image quality, lighting, unclear symptoms, or early disease stage. Consider taking multiple close-up photos of affected areas in natural lighting."
-      };
+      // Wait before retry with exponential backoff
+      const delay = Math.min(1000 * Math.pow(2, retryCount), 5000);
+      await new Promise(resolve => setTimeout(resolve, delay));
+      retryCount++;
     }
-  } catch (error) {
-    console.error('Error in disease analysis:', error);
-    
-    // Return a response indicating analysis failure
-    return {
-      disease: "Analysis Failed",
-      confidence: 0,
-      treatment: "Please try again with a clearer image or contact agricultural support for in-person diagnosis.",
-      severity: "Medium",
-      details: "The image analysis process encountered a technical error. This might be due to image format, quality issues, or service limitations. Try a different image with clear symptoms visible."
-    };
   }
 };
-
-/**
- * Analyze soil from an image
- * @param imageData - The base64 encoded image data
- * @returns Structured analysis of soil
- */
-export const analyzeSoil = async (imageData: string): Promise<{
-  soilType: string;
-  fertility: 'Low' | 'Medium' | 'High';
-  phLevel: string;
-  recommendations: string;
-  suitableCrops: string[];
-  soilPresent: boolean;
-  confidenceScore?: number;
-  nutrients?: {
-    nitrogen: number;
-    phosphorus: number;
-    potassium: number;
-    organicMatter: number;
-    sulfur: number;
-  };
-  properties?: {
-    ph: number;
-    texture: string;
-    waterRetention: number;
-    drainage: string;
-  };
-}> => {
-  if (!geminiModel) {
-    console.error('Gemini client not initialized');
-    throw new Error('AI service not available');
-  }
-  
-  console.log('Analyzing soil sample with Gemini Vision...');
-  
-  try {
-    const prompt = `
-      Analyze this soil image and provide detailed, scientifically accurate soil analysis information. 
-      If no soil is visible, indicate that no soil is present.
-      
-      Important: Be accurate and scientific in your assessment. If you cannot determine certain properties with reasonable confidence, use the most likely estimate but add a confidence level.
-      
-      Focus on these visual indicators for your analysis:
-      - Color (dark = high organic, red = iron-rich, etc.)
-      - Texture (visible particles, clumping behavior)
-      - Moisture level
-      - Any visible organic matter, roots, or debris
-      - check if any person is detected in the image if detected then return no soil present
-      Return the analysis as valid JSON with the following structure:
-      {
-        "soilPresent": boolean,
-        "soilType": "Specific soil classification with confidence level (e.g., 'Clay Loam (High confidence)' or 'Sandy Soil (Medium confidence)')",
-        "fertility": "Low/Medium/High (based on color, organic content, texture)",
-        "phLevel": "Approximate pH with range (e.g., '6.5-7.0 (Neutral)')",
-        "recommendations": "Detailed, science-based recommendations for improving this specific soil",
-        "suitableCrops": ["crop1", "crop2", "crop3"],
-        "confidenceScore": number (1-10 scale of overall confidence in analysis),
-        "nutrients": {
-          "nitrogen": number (percentage between 0-100),
-          "phosphorus": number (percentage between 0-100),
-          "potassium": number (percentage between 0-100),
-          "organicMatter": number (percentage between 0-100),
-          "sulfur": number (percentage between 0-100)
-        },
-        "properties": {
-          "ph": number (between 0-14),
-          "texture": "Specific soil texture classification (Sand, Silt, Clay, Loam, Sandy Loam, etc.)",
-          "waterRetention": number (percentage between 0-100),
-          "drainage": "Good/Moderate/Poor"
-        }
-      }
-      
-      For fields that cannot be determined with high confidence, provide your best estimate followed by confidence level.
-      Make sure the JSON is valid and all numbers are actual numbers, not strings.
-    `;
-
-    const result = await analyzeImage(imageData, prompt);
-    
-    // Parse the JSON response or handle if it's not valid JSON
-    try {
-      let analysis;
-      // Extract JSON if it's wrapped in markdown code blocks
-      if (result.includes('```json')) {
-        const jsonMatch = result.match(/```json\n([\s\S]*?)\n```/);
-        if (jsonMatch && jsonMatch[1]) {
-          analysis = JSON.parse(jsonMatch[1]);
-        } else {
-          throw new Error('Could not extract JSON from response');
-        }
-      } else {
-        analysis = JSON.parse(result);
-      }
-      
-      // If no soil is present, return a default response
-      if (!analysis.soilPresent) {
-        return {
-          soilType: 'No Soil Detected',
-          fertility: 'Low',
-          phLevel: 'Unknown',
-          recommendations: 'No soil detected in the image. Please upload a clear image of soil for analysis.',
-          suitableCrops: [],
-          soilPresent: false,
-          confidenceScore: 3,
-          nutrients: {
-            nitrogen: 0,
-            phosphorus: 0,
-            potassium: 0,
-            organicMatter: 0,
-            sulfur: 0
-          },
-          properties: {
-            ph: 0,
-            texture: 'Unknown',
-            waterRetention: 0,
-            drainage: 'Poor'
-          }
-        };
-      }
-      
-      // Check for confidence score to determine accuracy
-      const confidenceScore = analysis.confidenceScore || 5;
-      const lowConfidence = confidenceScore < 5;
-      
-      // Set fertility with more precise analysis
-      let fertility: 'Low' | 'Medium' | 'High' = 'Medium';
-      if (analysis.fertility) {
-        if (typeof analysis.fertility === 'string') {
-          if (analysis.fertility.toLowerCase().includes('low')) {
-            fertility = 'Low';
-          } else if (analysis.fertility.toLowerCase().includes('high')) {
-            fertility = 'High';
-          } else {
-            fertility = 'Medium';
-          }
-        }
-      } else {
-        // Determine fertility based on organic matter if available
-        if (analysis.nutrients?.organicMatter) {
-          const organicMatter = Number(analysis.nutrients.organicMatter);
-          if (organicMatter < 20) fertility = 'Low';
-          else if (organicMatter > 50) fertility = 'High';
-          else fertility = 'Medium';
-        }
-      }
-      
-      // Process soil type to maintain clarity and accuracy
-      let soilType = analysis.soilType || '';
-      if (soilType.toLowerCase().includes('unable to determine') || 
-          soilType.toLowerCase().includes('unknown') || 
-          soilType.toLowerCase().includes('undetermined') || 
-          soilType === '') {
-        
-        // Use texture information if available to make a better guess
-        if (analysis.properties?.texture) {
-          soilType = `${analysis.properties.texture} Soil`;
-        } else {
-          // Fallback to a general description based on color or other characteristics
-          soilType = 'Agricultural Soil (Low confidence)';
-        }
-      }
-      
-      // Add disclaimer for low confidence
-      if (lowConfidence && !soilType.toLowerCase().includes('confidence')) {
-        soilType += ' (Low confidence)';
-      }
-      
-      // Process and normalize pH level
-      let phLevel = analysis.phLevel || 'Neutral';
-      if (!phLevel.toLowerCase().includes('acidic') && !phLevel.toLowerCase().includes('alkaline') && !phLevel.toLowerCase().includes('neutral')) {
-        const phValue = analysis.properties?.ph || 7;
-        if (phValue < 6) phLevel = `${phValue} (Acidic)`;
-        else if (phValue > 7.5) phLevel = `${phValue} (Alkaline)`;
-        else phLevel = `${phValue} (Neutral)`;
-      }
-      
-      // Build better recommendations based on soil type and nutrients
-      let recommendations = analysis.recommendations;
-      if (!recommendations || recommendations.trim() === '') {
-        recommendations = 'Based on the analysis:';
-        
-        if (fertility === 'Low') {
-          recommendations += ' Add organic compost to improve soil fertility.';
-        }
-        
-        if (analysis.properties?.ph) {
-          const ph = Number(analysis.properties.ph);
-          if (ph < 6) {
-            recommendations += ' Add agricultural lime to reduce soil acidity.';
-          } else if (ph > 7.5) {
-            recommendations += ' Add sulfur or organic matter to reduce alkalinity.';
-          }
-        }
-        
-        if (analysis.nutrients?.nitrogen && Number(analysis.nutrients.nitrogen) < 30) {
-          recommendations += ' Consider nitrogen-rich fertilizers or growing legumes.';
-        }
-        
-        if (analysis.properties?.drainage === 'Poor') {
-          recommendations += ' Improve drainage with sand or raised beds.';
-        }
-      }
-      
-      // Ensure all required fields are present with defaults if missing
-      const soilAnalysis: {
-        soilType: string;
-        fertility: 'Low' | 'Medium' | 'High';
-        phLevel: string;
-        recommendations: string;
-        suitableCrops: string[];
-        soilPresent: boolean;
-        confidenceScore?: number;
-        nutrients?: {
-          nitrogen: number;
-          phosphorus: number;
-          potassium: number;
-          organicMatter: number;
-          sulfur: number;
-        };
-        properties?: {
-          ph: number;
-          texture: string;
-          waterRetention: number;
-          drainage: string;
-        };
-      } = {
-        soilType: soilType,
-        fertility: fertility,
-        phLevel: phLevel,
-        recommendations: recommendations,
-        suitableCrops: analysis.suitableCrops || ['Beans', 'Potatoes', 'Corn'],
-        soilPresent: true,
-        confidenceScore: confidenceScore
-      };
-      
-      // Add nutrients with more careful validation
-      if (analysis.nutrients) {
-        soilAnalysis.nutrients = {
-          nitrogen: ensureValidPercentage(analysis.nutrients.nitrogen) || 20,
-          phosphorus: ensureValidPercentage(analysis.nutrients.phosphorus) || 15,
-          potassium: ensureValidPercentage(analysis.nutrients.potassium) || 18,
-          organicMatter: ensureValidPercentage(analysis.nutrients.organicMatter) || 5,
-          sulfur: ensureValidPercentage(analysis.nutrients.sulfur) || 10,
-        };
-      }
-      
-      // Add properties with more careful validation
-      if (analysis.properties) {
-        soilAnalysis.properties = {
-          ph: ensureValidPH(analysis.properties.ph) || 7,
-          texture: analysis.properties.texture || 'Medium',
-          waterRetention: ensureValidPercentage(analysis.properties.waterRetention) || 50,
-          drainage: analysis.properties.drainage || 'Moderate'
-        };
-      }
-      
-      console.log('Soil analysis completed successfully');
-      return soilAnalysis;
-    } catch (err) {
-      console.error('Failed to parse soil analysis response:', err);
-      console.error('Raw response:', result);
-      
-      // Return a fallback response with a more descriptive soil type
-      return {
-        soilType: 'Agricultural Soil (Low confidence)',
-        fertility: 'Medium',
-        phLevel: 'Neutral (estimated)',
-        recommendations: 'Based on limited analysis, this appears to be average agricultural soil. Consider soil testing for more accurate results. Add organic matter to improve overall health and structure.',
-        suitableCrops: ['Beans', 'Potatoes', 'Corn'],
-        soilPresent: true,
-        confidenceScore: 3,
-        nutrients: {
-          nitrogen: 20,
-          phosphorus: 15,
-          potassium: 18,
-          organicMatter: 5,
-          sulfur: 10
-        },
-        properties: {
-          ph: 7,
-          texture: 'Medium',
-          waterRetention: 50,
-          drainage: 'Moderate'
-        }
-      };
-    }
-  } catch (error) {
-    console.error('Error analyzing soil with Gemini:', error);
-    throw error;
-  }
-};
-
-// Helper function to ensure valid percentage values
-function ensureValidPercentage(value: any): number {
-  const num = parseFloat(value);
-  if (isNaN(num)) return 0;
-  return Math.max(0, Math.min(100, num));
-}
-
-// Helper function to ensure valid pH values
-function ensureValidPH(value: any): number {
-  const num = parseFloat(value);
-  if (isNaN(num)) return 7;
-  return Math.max(0, Math.min(14, num));
-}
 
 /**
  * Analyze an image for pest detection and recommendations
@@ -794,32 +706,14 @@ export const analyzePestImage = async (imageData: string, language: string = 'en
   } catch (error) {
     console.error('Error in pesticide analysis:', error);
     
-    // Error messages based on language
-    if (language === 'te') {
-      return {
-        pestType: 'విశ్లేషణ లోపం',
-        pesticideRecommendations: 'సేవ తాత్కాలికంగా అందుబాటులో లేదు. దయచేసి తర్వాత మళ్లీ ప్రయత్నించండి.',
-        organicAlternatives: 'సేవ తాత్కాలికంగా అందుబాటులో లేదు.',
-        preventionTips: 'క్రమం తప్పకుండా పంట పర్యవేక్షణ సిఫార్సు చేయబడింది.',
-        severity: 'Low'
-      };
-    } else if (language === 'hi') {
-      return {
-        pestType: 'विश्लेषण त्रुटि',
-        pesticideRecommendations: 'सेवा अस्थायी रूप से अनुपलब्ध है। कृपया बाद में पुनः प्रयास करें।',
-        organicAlternatives: 'सेवा अस्थायी रूप से अनुपलब्ध है।',
-        preventionTips: 'नियमित फसल निगरानी की सिफारिश की जाती है।',
-        severity: 'Low'
-      };
-    } else {
-      return {
-        pestType: 'Analysis Error',
-        pesticideRecommendations: 'Service temporarily unavailable. Please try again later.',
-        organicAlternatives: 'Service temporarily unavailable.',
-        preventionTips: 'Regular crop monitoring is recommended.',
-        severity: 'Low'
-      };
-    }
+    // Return a response indicating analysis failure
+    return {
+      pestType: 'Analysis Failed',
+      pesticideRecommendations: 'Please try again with a clearer image or contact agricultural support for in-person diagnosis.',
+      organicAlternatives: 'Please try again with a clearer image or contact agricultural support for in-person diagnosis.',
+      preventionTips: 'Regular crop monitoring is recommended.',
+      severity: 'Medium'
+    };
   }
 };
 
@@ -1025,4 +919,18 @@ export async function analyzeFarmImage(
     console.error("Error analyzing farm image:", error);
     throw error;
   }
+}
+
+// Helper function to ensure valid percentage values
+function ensureValidPercentage(value: any): number {
+  const num = parseFloat(value);
+  if (isNaN(num)) return 0;
+  return Math.max(0, Math.min(100, num));
+}
+
+// Helper function to ensure valid pH values
+function ensureValidPH(value: any): number {
+  const num = parseFloat(value);
+  if (isNaN(num)) return 7;
+  return Math.max(0, Math.min(14, num));
 }

@@ -1,12 +1,12 @@
-import React, { useState, useRef, ChangeEvent } from 'react';
+import React, { useState, useRef, ChangeEvent, useEffect } from 'react';
 import MainLayout from '@/components/layout/MainLayout';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Droplets, Upload, Loader2, AlertTriangle, Check, Info, FlaskConical, Leaf, Camera } from 'lucide-react';
+import { Droplets, Upload, Loader2, AlertTriangle, Check, Info, FlaskConical, Leaf, Camera, Cpu, Wifi, Zap, TrendingUp, BarChart3, Thermometer, Activity } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { analyzeSoil } from '@/services/geminiService';
 import { useTranslation } from 'react-i18next';
 import { Badge } from '@/components/ui/badge';
@@ -46,12 +46,64 @@ const SoilLab = () => {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysisResult, setAnalysisResult] = useState<SoilAnalysisResult | null>(null);
   const [noSoilDetected, setNoSoilDetected] = useState(false);
+  const [serviceReady, setServiceReady] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
+
+  // Check if Gemini service is available
+  useEffect(() => {
+    const checkService = async () => {
+      try {
+        // Check if API key is configured
+        const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+        if (!apiKey) {
+          console.error('Gemini API key not configured');
+          toast({
+            title: 'Service Configuration Error',
+            description: 'AI service is not properly configured. Please check your API key.',
+            variant: "destructive"
+          });
+          return;
+        }
+        
+        setServiceReady(true);
+        console.log('Soil Lab service ready');
+      } catch (error) {
+        console.error('Service check failed:', error);
+        toast({
+          title: 'Service Error',
+          description: 'AI service is not available. Please try again later.',
+          variant: "destructive"
+        });
+      }
+    };
+
+    checkService();
+  }, [toast]);
 
   const handleImageUpload = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      toast({
+        title: 'Invalid File Type',
+        description: 'Please upload a valid image file (PNG, JPG, JPEG)',
+        variant: "destructive"
+      });
+      return;
+    }
+
+    // Validate file size (max 10MB)
+    if (file.size > 10 * 1024 * 1024) {
+      toast({
+        title: 'File Too Large',
+        description: 'Please upload an image smaller than 10MB',
+        variant: "destructive"
+      });
+      return;
+    }
 
     setNoSoilDetected(false);
     setAnalysisResult(null);
@@ -63,26 +115,33 @@ const SoilLab = () => {
         setSelectedImage(imageData);
         setIsAnalyzing(true);
         
+        console.log('Starting soil analysis...');
+        
         try {
           const analysis = await analyzeSoil(imageData);
+          console.log('Soil analysis result:', analysis);
+          
+          if (!analysis) {
+            throw new Error('No analysis result received');
+          }
           
           if (!analysis.soilPresent) {
             setNoSoilDetected(true);
             setIsAnalyzing(false);
             toast({
-              title: t('noSoilDetected'),
-              description: t('pleaseUploadAnImageThatClearlyShowsSoil'),
+              title: 'No Soil Detected',
+              description: 'Please upload an image that clearly shows soil',
               variant: "destructive"
             });
             return;
           }
           
           setAnalysisResult({
-            soilType: analysis.soilType || 'Loamy',
+            soilType: analysis.soilType || 'Loamy Soil',
             fertility: analysis.fertility || 'Medium',
-            phLevel: analysis.phLevel || '6.5',
-            recommendations: analysis.recommendations || t('soilLab.defaultRecommendation'),
-            suitableCrops: analysis.suitableCrops || [t('soilLab.wheat'), t('soilLab.corn'), t('soilLab.rice')],
+            phLevel: analysis.phLevel || '6.5-7.0',
+            recommendations: analysis.recommendations || 'Regular soil testing recommended for optimal crop management.',
+            suitableCrops: analysis.suitableCrops || ['Wheat', 'Corn', 'Rice'],
             imageSrc: imageData,
             soilPresent: true,
             nutrients: {
@@ -93,24 +152,24 @@ const SoilLab = () => {
               sulfur: analysis.nutrients?.sulfur || 10
             },
             properties: {
-              ph: analysis.properties?.ph || 6.5,
+              ph: analysis.properties?.ph || 6.8,
               texture: analysis.properties?.texture || 'Loamy',
               waterRetention: analysis.properties?.waterRetention || 65,
               drainage: analysis.properties?.drainage || 'Good'
             },
-            confidenceScore: analysis.confidenceScore
+            confidenceScore: analysis.confidenceScore || 6
           });
           
           toast({
-            title: t('soilAnalysisComplete'),
-            description: `${t('soilType')}: ${analysis.soilType}, ${t('fertility')}: ${analysis.fertility}`,
+            title: 'Soil Analysis Complete',
+            description: `Soil Type: ${analysis.soilType}, Fertility: ${analysis.fertility}`,
             variant: "default"
           });
-        } catch (error) {
+        } catch (error: any) {
           console.error('Error analyzing soil:', error);
           toast({
-            title: t('analysisFailed'),
-            description: t('unableToAnalyzeTheSoilImagePleaseTryAgain'),
+            title: 'Analysis Failed',
+            description: error.message || 'Unable to analyze the soil image. Please try again.',
             variant: "destructive"
           });
         } finally {
@@ -120,8 +179,8 @@ const SoilLab = () => {
         console.error('Error processing image:', error);
         setIsAnalyzing(false);
         toast({
-          title: t('error'),
-          description: t('errorProcessingImage'),
+          title: 'Error',
+          description: 'Error processing image. Please try again.',
           variant: "destructive"
         });
       }
@@ -131,8 +190,8 @@ const SoilLab = () => {
       console.error('FileReader error');
       setIsAnalyzing(false);
       toast({
-        title: t('error'),
-        description: t('errorReadingFile'),
+        title: 'Error',
+        description: 'Error reading file. Please try again.',
         variant: "destructive"
       });
     };
@@ -141,7 +200,7 @@ const SoilLab = () => {
   };
 
   const handleAnalyzeButtonClick = () => {
-    if (!selectedImage || isAnalyzing) return;
+    if (!selectedImage || isAnalyzing || !serviceReady) return;
     
     const dataURLtoBlob = (dataURL: string) => {
       const arr = dataURL.split(',');
@@ -271,239 +330,342 @@ const SoilLab = () => {
     return 'text-green-500';
   };
 
-  const renderUploadSection = () => {
-    return (
-      <div className="flex flex-col items-center justify-center p-8 border-2 border-dashed border-gray-300 rounded-lg bg-gray-50">
-        <FlaskConical className="h-12 w-12 text-agri-soil mb-4" />
-        <h3 className="text-lg font-medium text-gray-700 mb-2">{t('soilAnalysis')}</h3>
-        <p className="text-sm text-gray-500 mb-6 text-center max-w-md">
-          {t('uploadAClearPhotoOfYourSoilSampleToGetDetailedAnalysisOfSoilTypeFertilityPHLevelAndCropRecommendations')}
-        </p>
-        <label htmlFor="soil-image-upload">
-          <div className="relative inline-block">
-            <Button className="bg-agri-soil hover:bg-agri-soil/90" disabled={isAnalyzing}>
-              {isAnalyzing ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  {t('analyzingSoil')}...
-                </>
-              ) : (
-                <>
-                  <Upload className="mr-2 h-4 w-4" />
-                  {t('uploadSoilImage')}
-                </>
-              )}
-            </Button>
-            <input
-              id="soil-image-upload"
-              type="file"
-              accept="image/*"
-              capture="environment"
-              className="absolute inset-0 opacity-0 cursor-pointer"
-              onChange={handleImageUpload}
-              disabled={isAnalyzing}
-            />
-          </div>
-        </label>
-      </div>
-    );
+  // Calculate soil health score based on multiple factors
+  const calculateSoilHealthScore = (result: SoilAnalysisResult): number => {
+    let score = 0;
+    
+    // pH score (0-25 points)
+    const ph = result.properties.ph;
+    if (ph >= 6.0 && ph <= 7.5) score += 25; // Optimal range
+    else if (ph >= 5.5 && ph <= 8.0) score += 20; // Good range
+    else if (ph >= 5.0 && ph <= 8.5) score += 15; // Acceptable range
+    else score += 5; // Poor range
+    
+    // Organic matter score (0-25 points)
+    const organicMatter = result.nutrients.organicMatter;
+    if (organicMatter >= 4) score += 25; // Excellent
+    else if (organicMatter >= 3) score += 20; // Good
+    else if (organicMatter >= 2) score += 15; // Fair
+    else score += 5; // Poor
+    
+    // Nutrient balance score (0-30 points)
+    const { nitrogen, phosphorus, potassium } = result.nutrients;
+    const avgNutrients = (nitrogen + phosphorus + potassium) / 3;
+    if (avgNutrients >= 40) score += 30; // Excellent
+    else if (avgNutrients >= 30) score += 25; // Good
+    else if (avgNutrients >= 20) score += 20; // Fair
+    else score += 10; // Poor
+    
+    // Water retention score (0-20 points)
+    const waterRetention = result.properties.waterRetention;
+    if (waterRetention >= 60 && waterRetention <= 80) score += 20; // Optimal
+    else if (waterRetention >= 50 && waterRetention <= 90) score += 15; // Good
+    else if (waterRetention >= 40 && waterRetention <= 95) score += 10; // Fair
+    else score += 5; // Poor
+    
+    return Math.min(100, score);
   };
 
-  const renderSoilResult = () => {
-    if (!analysisResult) return null;
-    
-    return (
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div className="overflow-hidden rounded-lg border border-gray-200">
-          <img 
-            src={analysisResult.imageSrc ?? ''} 
-            alt="Soil image" 
-            className="w-full h-auto"
-          />
-        </div>
-        <div className="space-y-4">
-          <div>
-            <h3 className="text-xl font-semibold text-agri-darkGreen flex items-center">
-              <Droplets className="h-5 w-5 text-agri-blue mr-2" />
-              {analysisResult.soilType}
-            </h3>
-            <div className="mt-2 flex items-center">
-              <span className="text-sm text-gray-500 mr-2">{t('fertility')}:</span>
-              <span className={`font-medium ${getFertilityColor(analysisResult.fertility)}`}>
-                {analysisResult.fertility}
-              </span>
-            </div>
-            <div className="mt-1">
-              <span className="text-sm text-gray-500 mr-2">{t('phLevel')}:</span>
-              <span className="font-medium">{analysisResult.phLevel}</span>
-            </div>
-            <div className="mt-1 flex items-center">
-              <span className="text-sm text-gray-500 mr-2">{t('soilLab.analysisConfidence')}:</span>
-              <span className={`font-medium ${getConfidenceColor(analysisResult)}`}>
-                {getConfidenceDisplay(analysisResult)}
-              </span>
-            </div>
-          </div>
-          
-          <div>
-            <h4 className="font-medium text-gray-700 mb-1">{t('recommendations')}</h4>
-            <p className="text-sm text-gray-600">{analysisResult.recommendations}</p>
-          </div>
-          
-          <div>
-            <h4 className="font-medium text-gray-700 mb-2">{t('suitableCrops')}</h4>
-            <div className="flex flex-wrap gap-2">
-              {analysisResult.suitableCrops.map((crop, index) => (
-                <Badge 
-                  key={index} 
-                  className="bg-agri-freshGreen/10 text-agri-freshGreen hover:bg-agri-freshGreen/20"
-                >
-                  <Leaf className="h-3 w-3 mr-1" />
-                  {crop}
-                </Badge>
-              ))}
-            </div>
-          </div>
+  // Get health score color and label
+  const getHealthScoreInfo = (score: number) => {
+    if (score >= 80) return { color: 'text-green-600', bg: 'bg-green-100', label: 'Excellent', icon: '🌟' };
+    if (score >= 65) return { color: 'text-blue-600', bg: 'bg-blue-100', label: 'Good', icon: '👍' };
+    if (score >= 50) return { color: 'text-yellow-600', bg: 'bg-yellow-100', label: 'Fair', icon: '⚠️' };
+    return { color: 'text-red-600', bg: 'bg-red-100', label: 'Poor', icon: '🚨' };
+  };
 
-          {hasLowConfidence(analysisResult) && (
-            <Alert variant="default" className="mt-4">
-              <AlertTitle className="flex items-center">
-                <Info className="mr-2 h-4 w-4" />
-                {t('soilLab.limitedConfidence')}
-              </AlertTitle>
-              <AlertDescription>
-                {t('soilLab.labTestingRecommended')}
-              </AlertDescription>
-            </Alert>
-          )}
-          
-          <div className="flex space-x-3 mt-4">
-            <Button 
-              variant="outline" 
-              onClick={() => setAnalysisResult(null)}
-              className="flex-1"
-            >
-              {t('analyzeAnotherSample')}
-            </Button>
-            <Button className="bg-agri-soil hover:bg-agri-soil/90">
-              {t('saveReport')}
-            </Button>
-          </div>
-        </div>
-      </div>
-    );
+  // Generate personalized recommendations based on analysis
+  const generateSmartRecommendations = (result: SoilAnalysisResult): string[] => {
+    const recommendations: string[] = [];
+    const { nutrients, properties } = result;
+    
+    // pH recommendations
+    if (properties.ph < 6.0) {
+      recommendations.push("🔬 Add agricultural lime to raise pH and reduce acidity");
+    } else if (properties.ph > 7.5) {
+      recommendations.push("🔬 Add sulfur or organic matter to lower pH");
+    }
+    
+    // Nutrient recommendations
+    if (nutrients.nitrogen < 25) {
+      recommendations.push("🌱 Apply nitrogen-rich fertilizer or plant legumes to fix nitrogen");
+    }
+    if (nutrients.phosphorus < 20) {
+      recommendations.push("🦴 Add bone meal or rock phosphate for phosphorus");
+    }
+    if (nutrients.potassium < 25) {
+      recommendations.push("🍌 Apply potash or wood ash for potassium");
+    }
+    
+    // Organic matter recommendations
+    if (nutrients.organicMatter < 3) {
+      recommendations.push("🍂 Add compost, manure, or cover crops to increase organic matter");
+    }
+    
+    // Water management
+    if (properties.waterRetention < 50) {
+      recommendations.push("💧 Improve water retention with organic matter and mulching");
+    } else if (properties.waterRetention > 85) {
+      recommendations.push("🌊 Improve drainage with sand or raised beds");
+    }
+    
+    // Texture-based recommendations
+    if (properties.texture.toLowerCase().includes('clay')) {
+      recommendations.push("🏗️ Add organic matter and sand to improve clay soil structure");
+    } else if (properties.texture.toLowerCase().includes('sand')) {
+      recommendations.push("🌾 Add organic matter and clay to improve sandy soil retention");
+    }
+    
+    return recommendations;
+  };
+
+  // Get crop recommendations based on soil conditions
+  const getOptimizedCropRecommendations = (result: SoilAnalysisResult): Array<{crop: string, suitability: number, reason: string}> => {
+    const crops = [
+      { name: 'Tomatoes', phRange: [6.0, 6.8], nutrients: { n: 30, p: 25, k: 35 } },
+      { name: 'Corn', phRange: [6.0, 6.8], nutrients: { n: 40, p: 30, k: 25 } },
+      { name: 'Wheat', phRange: [6.0, 7.0], nutrients: { n: 35, p: 20, k: 20 } },
+      { name: 'Rice', phRange: [5.5, 6.5], nutrients: { n: 25, p: 15, k: 20 } },
+      { name: 'Soybeans', phRange: [6.0, 7.0], nutrients: { n: 20, p: 25, k: 30 } },
+      { name: 'Potatoes', phRange: [5.8, 6.2], nutrients: { n: 30, p: 35, k: 40 } }
+    ];
+    
+    return crops.map(crop => {
+      let suitability = 0;
+      let reasons: string[] = [];
+      
+      // pH suitability
+      const ph = result.properties.ph;
+      if (ph >= crop.phRange[0] && ph <= crop.phRange[1]) {
+        suitability += 40;
+        reasons.push('optimal pH');
+      } else if (Math.abs(ph - (crop.phRange[0] + crop.phRange[1]) / 2) <= 0.5) {
+        suitability += 25;
+        reasons.push('acceptable pH');
+      }
+      
+      // Nutrient suitability
+      const nMatch = Math.max(0, 100 - Math.abs(result.nutrients.nitrogen - crop.nutrients.n));
+      const pMatch = Math.max(0, 100 - Math.abs(result.nutrients.phosphorus - crop.nutrients.p));
+      const kMatch = Math.max(0, 100 - Math.abs(result.nutrients.potassium - crop.nutrients.k));
+      
+      const avgNutrientMatch = (nMatch + pMatch + kMatch) / 3;
+      suitability += (avgNutrientMatch / 100) * 40;
+      
+      if (avgNutrientMatch > 80) reasons.push('excellent nutrient match');
+      else if (avgNutrientMatch > 60) reasons.push('good nutrients');
+      
+      // Water retention suitability
+      if (result.properties.waterRetention >= 50 && result.properties.waterRetention <= 80) {
+        suitability += 20;
+        reasons.push('good water retention');
+      }
+      
+      return {
+        crop: crop.name,
+        suitability: Math.round(suitability),
+        reason: reasons.join(', ') || 'needs soil improvement'
+      };
+    }).sort((a, b) => b.suitability - a.suitability);
   };
 
   return (
     <MainLayout>
-      <div className="container mx-auto p-4 max-w-6xl">
-        <div className="mb-6">
-          <h1 className="text-2xl font-bold text-agri-darkGreen mb-2">
+      <motion.div 
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="container mx-auto p-4 max-w-7xl"
+      >
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mb-6"
+        >
+          <h1 className="text-3xl font-bold text-agri-darkGreen mb-2 flex items-center">
+            <FlaskConical className="mr-3 h-8 w-8 text-agri-soil" />
             {t('soilLab.title')}
           </h1>
-          <p className="text-gray-600">
-            {t('soilLab.subtitle')}
+          <p className="text-gray-600 text-lg">
+            {t('soilLab.subtitle')} - Advanced AI-powered soil analysis with precision insights
           </p>
-        </div>
+        </motion.div>
         
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Image Upload Section */}
-          <Card className="lg:col-span-1">
-            <CardHeader>
-              <CardTitle className="text-agri-darkGreen flex items-center">
-                <Upload className="mr-2 h-5 w-5 text-agri-soil" />
-                {t('soilLab.uploadSoil')}
-              </CardTitle>
-              <CardDescription>
-                {t('soilLab.uploadDescription')}
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div 
-                className={`border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-colors ${
-                  selectedImage ? 'border-agri-soil' : 'border-gray-300 hover:border-agri-soil'
-                }`}
-                onClick={() => fileInputRef.current?.click()}
-              >
-                {selectedImage ? (
-                  <div className="space-y-4">
-                    <div className="relative w-full h-48 mx-auto">
-                      <img 
-                        src={selectedImage} 
-                        alt="Soil sample" 
-                        className="w-full h-full object-cover rounded-md"
-                      />
-                    </div>
-                    <p className="text-sm text-gray-500">
-                      {t('soilLab.clickToChangeImage')}
-                    </p>
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    <Droplets className="h-12 w-12 text-agri-soil/30 mx-auto" />
-                    <div>
-                      <p className="text-agri-soil font-medium">
-                        {t('soilLab.dragAndDrop')}
-                      </p>
-                      <p className="text-sm text-gray-500 mt-1">
-                        {t('soilLab.orClickToUpload')}
-                      </p>
-                    </div>
-                  </div>
-                )}
-                <input
-                  type="file"
-                  ref={fileInputRef}
-                  className="hidden"
-                  accept="image/*"
-                  capture="environment"
-                  onChange={handleImageUpload}
-                />
-              </div>
-              
-              <div className="flex gap-2 mt-4">
-                <Button 
-                  className="flex-1 bg-agri-soil hover:bg-agri-soil/90"
-                  disabled={!selectedImage || isAnalyzing}
-                  onClick={handleAnalyzeButtonClick}
+        <div className="grid grid-cols-1 xl:grid-cols-4 gap-6">
+          <motion.div
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: 0.1 }}
+            className="xl:col-span-1"
+          >
+            <Card className="h-fit">
+              <CardHeader>
+                <CardTitle className="text-agri-darkGreen flex items-center">
+                  <Upload className="mr-2 h-5 w-5 text-agri-soil" />
+                  {t('soilLab.uploadSoil')}
+                </CardTitle>
+                <CardDescription>
+                  {t('soilLab.uploadDescription')}
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div 
+                  className={`border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-all duration-300 ${
+                    selectedImage ? 'border-agri-soil bg-agri-soil/5' : 'border-gray-300 hover:border-agri-soil hover:bg-agri-soil/5'
+                  }`}
+                  onClick={() => fileInputRef.current?.click()}
                 >
-                  {isAnalyzing ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      {t('soilLab.analyzing')}...
-                    </>
-                  ) : (
-                    <>
-                      {t('soilLab.analyzeNow')}
-                    </>
-                  )}
-                </Button>
-                
-                <label htmlFor="camera-capture-soil" className="relative inline-block">
-                  <Button 
-                    className="bg-agri-blue hover:bg-agri-blue/90" 
-                    disabled={isAnalyzing}
-                    type="button"
-                  >
-                    <Camera className="mr-2 h-4 w-4" />
-                    {t('soilLab.takeSoilPhoto')}
-                  </Button>
+                  <AnimatePresence mode="wait">
+                    {selectedImage ? (
+                      <motion.div 
+                        key="image"
+                        initial={{ opacity: 0, scale: 0.8 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={{ opacity: 0, scale: 0.8 }}
+                        className="space-y-4"
+                      >
+                        <div className="relative w-full h-48 mx-auto">
+                          <img 
+                            src={selectedImage} 
+                            alt="Soil sample" 
+                            className="w-full h-full object-cover rounded-md shadow-md"
+                          />
+                          <div className="absolute top-2 right-2 bg-green-500 text-white px-2 py-1 rounded-full text-xs font-medium">
+                            Ready
+                          </div>
+                        </div>
+                        <p className="text-sm text-gray-500">
+                          {t('soilLab.clickToChangeImage')}
+                        </p>
+                      </motion.div>
+                    ) : (
+                      <motion.div 
+                        key="placeholder"
+                        initial={{ opacity: 0, scale: 0.8 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={{ opacity: 0, scale: 0.8 }}
+                        className="space-y-4"
+                      >
+                        <Droplets className="h-12 w-12 text-agri-soil/30 mx-auto" />
+                        <div>
+                          <p className="text-agri-soil font-medium">
+                            {t('soilLab.dragAndDrop')}
+                          </p>
+                          <p className="text-sm text-gray-500 mt-1">
+                            {t('soilLab.orClickToUpload')}
+                          </p>
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
                   <input
-                    id="camera-capture-soil"
                     type="file"
-                    accept="image/*" 
+                    ref={fileInputRef}
+                    className="hidden"
+                    accept="image/*"
                     capture="environment"
-                    className="absolute inset-0 opacity-0 w-full h-full cursor-pointer"
                     onChange={handleImageUpload}
-                    disabled={isAnalyzing}
                   />
-                </label>
-              </div>
-            </CardContent>
-          </Card>
-          
-          {/* Analysis Results Section */}
-          <Card className={`lg:col-span-2 ${!analysisResult && 'flex items-center justify-center'}`}>
+                </div>
+                
+                <div className="flex gap-2 mt-4">
+                  <Button 
+                    className="flex-1 bg-agri-soil hover:bg-agri-soil/90 transition-all duration-300"
+                    disabled={!selectedImage || isAnalyzing || !serviceReady}
+                    onClick={handleAnalyzeButtonClick}
+                  >
+                    {isAnalyzing ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        {t('soilLab.analyzing')}...
+                      </>
+                    ) : (
+                      <>
+                        <BarChart3 className="mr-2 h-4 w-4" />
+                        {t('soilLab.analyzeNow')}
+                      </>
+                    )}
+                  </Button>
+                  
+                  <label htmlFor="camera-capture-soil" className="relative inline-block">
+                    <Button 
+                      className="bg-agri-blue hover:bg-agri-blue/90 transition-all duration-300" 
+                      disabled={isAnalyzing || !serviceReady}
+                      type="button"
+                    >
+                      <Camera className="mr-2 h-4 w-4" />
+                      {t('soilLab.takeSoilPhoto')}
+                    </Button>
+                    <input
+                      id="camera-capture-soil"
+                      type="file"
+                      accept="image/*" 
+                      capture="environment"
+                      className="absolute inset-0 opacity-0 w-full h-full cursor-pointer"
+                      onChange={handleImageUpload}
+                      disabled={isAnalyzing || !serviceReady}
+                    />
+                  </label>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Future Sensors Integration Card */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.3 }}
+              className="mt-6"
+            >
+              <Card className="border-2 border-dashed border-blue-200 bg-gradient-to-br from-blue-50 to-indigo-50">
+                <CardHeader>
+                  <CardTitle className="text-blue-700 flex items-center text-lg">
+                    <Cpu className="mr-2 h-5 w-5" />
+                    Future: IoT Sensors
+                  </CardTitle>
+                  <CardDescription className="text-blue-600">
+                    Coming Soon - Real-time soil monitoring
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="flex items-center space-x-2 p-2 bg-white/50 rounded-md">
+                      <Thermometer className="h-4 w-4 text-red-500" />
+                      <span className="text-sm font-medium">Temperature</span>
+                    </div>
+                    <div className="flex items-center space-x-2 p-2 bg-white/50 rounded-md">
+                      <Droplets className="h-4 w-4 text-blue-500" />
+                      <span className="text-sm font-medium">Moisture</span>
+                    </div>
+                    <div className="flex items-center space-x-2 p-2 bg-white/50 rounded-md">
+                      <Activity className="h-4 w-4 text-green-500" />
+                      <span className="text-sm font-medium">pH Level</span>
+                    </div>
+                    <div className="flex items-center space-x-2 p-2 bg-white/50 rounded-md">
+                      <Zap className="h-4 w-4 text-yellow-500" />
+                      <span className="text-sm font-medium">Nutrients</span>
+                    </div>
+                  </div>
+                  
+                  <Alert className="border-blue-200 bg-blue-50">
+                    <Wifi className="h-4 w-4 text-blue-600" />
+                    <AlertTitle className="text-blue-700">Smart Integration</AlertTitle>
+                    <AlertDescription className="text-blue-600 text-sm">
+                      We're developing IoT sensors that will provide 24/7 real-time soil monitoring, 
+                      automatic data collection, and predictive analytics for optimal crop management.
+                    </AlertDescription>
+                  </Alert>
+                  
+                  <div className="text-center">
+                    <Badge variant="secondary" className="bg-blue-100 text-blue-700">
+                      <TrendingUp className="mr-1 h-3 w-3" />
+                      Enhanced Accuracy Coming Soon
+                    </Badge>
+                  </div>
+                </CardContent>
+              </Card>
+            </motion.div>
+          </motion.div>
+          <Card className={`xl:col-span-3 ${!analysisResult && 'flex items-center justify-center'}`}>
             {noSoilDetected && (
               <Alert variant="destructive" className="mb-4">
                 <AlertTitle>{t('noSoilDetected')}</AlertTitle>
@@ -532,12 +694,145 @@ const SoilLab = () => {
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <Tabs defaultValue="nutrients">
+                  <Tabs defaultValue="overview">
                     <TabsList className="mb-4">
+                      <TabsTrigger value="overview">{t('soilLab.overview')}</TabsTrigger>
                       <TabsTrigger value="nutrients">{t('soilLab.nutrients')}</TabsTrigger>
                       <TabsTrigger value="properties">{t('soilLab.properties')}</TabsTrigger>
                       <TabsTrigger value="recommendations">{t('soilLab.recommendations')}</TabsTrigger>
+                      <TabsTrigger value="healthScore">{t('soilLab.healthScore')}</TabsTrigger>
                     </TabsList>
+                    
+                    <TabsContent value="overview" className="space-y-4">
+                      {/* Soil Health Score Card */}
+                      <motion.div 
+                        initial={{ opacity: 0, scale: 0.95 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        className="bg-gradient-to-r from-agri-green/10 to-agri-blue/10 p-6 rounded-lg border border-agri-green/20"
+                      >
+                        <div className="flex items-center justify-between mb-4">
+                          <h3 className="text-lg font-semibold text-agri-darkGreen">Soil Health Score</h3>
+                          <div className="flex items-center space-x-2">
+                            <span className="text-3xl font-bold text-agri-darkGreen">
+                              {calculateSoilHealthScore(analysisResult)}
+                            </span>
+                            <span className="text-sm text-gray-500">/100</span>
+                          </div>
+                        </div>
+                        
+                        <div className="flex items-center space-x-3 mb-3">
+                          <div className={`px-3 py-1 rounded-full text-sm font-medium ${getHealthScoreInfo(calculateSoilHealthScore(analysisResult)).bg} ${getHealthScoreInfo(calculateSoilHealthScore(analysisResult)).color}`}>
+                            {getHealthScoreInfo(calculateSoilHealthScore(analysisResult)).icon} {getHealthScoreInfo(calculateSoilHealthScore(analysisResult)).label}
+                          </div>
+                        </div>
+                        
+                        <Progress 
+                          value={calculateSoilHealthScore(analysisResult)} 
+                          className="h-3 bg-gray-200"
+                        >
+                          <div 
+                            className="h-full bg-gradient-to-r from-agri-green to-agri-blue rounded-full transition-all duration-500" 
+                            style={{ width: `${calculateSoilHealthScore(analysisResult)}%` }}
+                          ></div>
+                        </Progress>
+                      </motion.div>
+
+                      {/* Quick Stats Grid */}
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <motion.div 
+                          initial={{ opacity: 0, y: 20 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ delay: 0.1 }}
+                          className="bg-white p-4 rounded-lg border border-agri-green/20 text-center"
+                        >
+                          <div className="text-2xl mb-2">🌱</div>
+                          <div className="text-sm text-gray-500">Fertility</div>
+                          <div className="font-semibold text-agri-darkGreen">{analysisResult.fertility}</div>
+                        </motion.div>
+                        
+                        <motion.div 
+                          initial={{ opacity: 0, y: 20 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ delay: 0.2 }}
+                          className="bg-white p-4 rounded-lg border border-agri-blue/20 text-center"
+                        >
+                          <div className="text-2xl mb-2">🔬</div>
+                          <div className="text-sm text-gray-500">pH Level</div>
+                          <div className="font-semibold text-agri-darkGreen">{analysisResult.properties.ph}</div>
+                        </motion.div>
+                        
+                        <motion.div 
+                          initial={{ opacity: 0, y: 20 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ delay: 0.3 }}
+                          className="bg-white p-4 rounded-lg border border-agri-amber/20 text-center"
+                        >
+                          <div className="text-2xl mb-2">💧</div>
+                          <div className="text-sm text-gray-500">Water Retention</div>
+                          <div className="font-semibold text-agri-darkGreen">{analysisResult.properties.waterRetention}%</div>
+                        </motion.div>
+                        
+                        <motion.div 
+                          initial={{ opacity: 0, y: 20 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ delay: 0.4 }}
+                          className="bg-white p-4 rounded-lg border border-agri-tomato/20 text-center"
+                        >
+                          <div className="text-2xl mb-2">🍂</div>
+                          <div className="text-sm text-gray-500">Organic Matter</div>
+                          <div className="font-semibold text-agri-darkGreen">{analysisResult.nutrients.organicMatter}%</div>
+                        </motion.div>
+                      </div>
+
+                      {/* Top Crop Recommendations */}
+                      <motion.div 
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.5 }}
+                        className="bg-white p-6 rounded-lg border border-agri-green/20"
+                      >
+                        <h3 className="text-lg font-semibold text-agri-darkGreen mb-4 flex items-center">
+                          <Leaf className="h-5 w-5 mr-2 text-agri-green" />
+                          Best Crop Matches
+                        </h3>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                          {getOptimizedCropRecommendations(analysisResult).slice(0, 3).map((crop, index) => (
+                            <div key={index} className="p-3 bg-agri-green/5 rounded-lg border border-agri-green/10">
+                              <div className="flex items-center justify-between mb-2">
+                                <span className="font-medium text-agri-darkGreen">{crop.crop}</span>
+                                <Badge variant="secondary" className="bg-agri-green/20 text-agri-darkGreen">
+                                  {crop.suitability}%
+                                </Badge>
+                              </div>
+                              <p className="text-xs text-gray-600">{crop.reason}</p>
+                            </div>
+                          ))}
+                        </div>
+                      </motion.div>
+
+                      {/* Analysis Details */}
+                      <div className="bg-agri-soil/10 p-4 rounded-md">
+                        <h4 className="font-medium flex items-center text-agri-darkGreen mb-2">
+                          <FlaskConical className="h-4 w-4 mr-1 text-agri-soil" />
+                          Analysis Summary
+                        </h4>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                          <div>
+                            <p><strong>Soil Type:</strong> {analysisResult.soilType}</p>
+                            <p><strong>Texture:</strong> {analysisResult.properties.texture}</p>
+                            <p><strong>Drainage:</strong> {analysisResult.properties.drainage}</p>
+                          </div>
+                          <div>
+                            <p><strong>Confidence:</strong> 
+                              <span className={getConfidenceColor(analysisResult)}>
+                                {getConfidenceDisplay(analysisResult)}
+                              </span>
+                            </p>
+                            <p><strong>Analysis Date:</strong> {new Date().toLocaleDateString()}</p>
+                          </div>
+                        </div>
+                      </div>
+                    </TabsContent>
                     
                     <TabsContent value="nutrients" className="space-y-4">
                       <div className="space-y-1">
@@ -742,6 +1037,47 @@ const SoilLab = () => {
                         </ul>
                       </div>
                     </TabsContent>
+                    
+                    <TabsContent value="healthScore" className="space-y-4">
+                      <div className="bg-agri-green/10 p-4 rounded-md mb-4">
+                        <h4 className="font-medium flex items-center text-agri-darkGreen mb-2">
+                          <Check className="h-4 w-4 mr-1 text-agri-green" />
+                          {t('soilLab.soilHealthScore')}
+                        </h4>
+                        <div className="flex items-center space-x-2">
+                          <p className="text-3xl font-bold">{calculateSoilHealthScore(analysisResult)}</p>
+                          <p className="text-sm text-gray-500">/100</p>
+                        </div>
+                        <div className="mt-2">
+                          <p className="text-sm text-gray-500">{getHealthScoreInfo(calculateSoilHealthScore(analysisResult)).label}</p>
+                          <p className="text-xs text-gray-500">{getHealthScoreInfo(calculateSoilHealthScore(analysisResult)).icon}</p>
+                        </div>
+                      </div>
+                      
+                      <div className="bg-agri-amber/10 p-4 rounded-md mb-4">
+                        <h4 className="font-medium flex items-center text-agri-darkGreen mb-2">
+                          <Info className="h-4 w-4 mr-1 text-agri-amber" />
+                          {t('soilLab.smartRecommendations')}
+                        </h4>
+                        <ul className="list-disc pl-5 text-sm space-y-1">
+                          {generateSmartRecommendations(analysisResult).map((recommendation, index) => (
+                            <li key={index}>{recommendation}</li>
+                          ))}
+                        </ul>
+                      </div>
+                      
+                      <div className="bg-agri-tomato/10 p-4 rounded-md">
+                        <h4 className="font-medium flex items-center text-agri-darkGreen mb-2">
+                          <AlertTriangle className="h-4 w-4 mr-1 text-agri-tomato" />
+                          {t('soilLab.optimizedCropRecommendations')}
+                        </h4>
+                        <ul className="list-disc pl-5 text-sm space-y-1">
+                          {getOptimizedCropRecommendations(analysisResult).map((recommendation, index) => (
+                            <li key={index}>{recommendation.crop} ({recommendation.suitability}% - {recommendation.reason})</li>
+                          ))}
+                        </ul>
+                      </div>
+                    </TabsContent>
                   </Tabs>
                 </CardContent>
                 <CardFooter>
@@ -760,7 +1096,7 @@ const SoilLab = () => {
             )}
           </Card>
         </div>
-      </div>
+      </motion.div>
     </MainLayout>
   );
 };

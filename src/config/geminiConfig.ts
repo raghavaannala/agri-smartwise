@@ -4,6 +4,7 @@ import { initGeminiClient } from '@/services/geminiService';
 let isInitialized = false;
 let isInitializing = false;
 let initializationError: Error | null = null;
+let lastInitAttempt = 0;
 
 /**
  * Initialize the Gemini AI client with the API key from environment variables
@@ -13,6 +14,13 @@ export const setupGeminiClient = async (forceReInit = false): Promise<boolean> =
   // Return cached result if already initialized and not forcing re-init
   if (isInitialized && !forceReInit) {
     return true;
+  }
+  
+  // Prevent too frequent re-initialization attempts (minimum 30 seconds between attempts)
+  const now = Date.now();
+  if (!forceReInit && (now - lastInitAttempt) < 30000 && initializationError) {
+    console.log('Skipping Gemini re-initialization - too soon since last attempt');
+    return false;
   }
   
   // Prevent concurrent initialization
@@ -32,6 +40,7 @@ export const setupGeminiClient = async (forceReInit = false): Promise<boolean> =
   isInitializing = true;
   isInitialized = false;
   initializationError = null;
+  lastInitAttempt = now;
   
   try {
     // Get API key from environment variable
@@ -47,18 +56,23 @@ export const setupGeminiClient = async (forceReInit = false): Promise<boolean> =
     
     console.log('Initializing Gemini AI client...');
     
-    // Create a promise that times out after 10 seconds
+    // Create a promise that times out after 15 seconds
     const timeout = new Promise<boolean>((_, reject) => {
-      setTimeout(() => reject(new Error('Gemini client initialization timed out')), 10000);
+      setTimeout(() => reject(new Error('Gemini client initialization timed out')), 15000);
     });
     
     // Initialize the client
     const initialize = new Promise<boolean>(async (resolve) => {
       try {
-        await initGeminiClient(apiKey);
-        console.log('Gemini AI client initialized successfully');
-        isInitialized = true;
-        resolve(true);
+        const success = await initGeminiClient(apiKey);
+        if (success) {
+          console.log('Gemini AI client initialized successfully');
+          isInitialized = true;
+          resolve(true);
+        } else {
+          console.warn('Gemini AI client initialization failed');
+          resolve(false);
+        }
       } catch (err) {
         const error = err instanceof Error ? err : new Error(String(err));
         console.error('Error initializing Gemini client:', error.message);
@@ -93,6 +107,28 @@ export const isGeminiInitialized = (): boolean => {
  */
 export const getGeminiInitError = (): Error | null => {
   return initializationError;
+};
+
+/**
+ * Attempts to reinitialize Gemini if it's not working
+ * @returns Promise resolving to success status
+ */
+export const reinitializeGemini = async (): Promise<boolean> => {
+  console.log('Attempting to reinitialize Gemini client...');
+  return await setupGeminiClient(true);
+};
+
+/**
+ * Gets the status of the Gemini service
+ * @returns Object with initialization status and error info
+ */
+export const getGeminiStatus = () => {
+  return {
+    isInitialized,
+    isInitializing,
+    error: initializationError,
+    lastAttempt: lastInitAttempt
+  };
 };
 
 export default setupGeminiClient;
