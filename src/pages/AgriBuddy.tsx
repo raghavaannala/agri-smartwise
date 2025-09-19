@@ -158,6 +158,15 @@ const AgriBuddy: React.FC = () => {
       
       console.log('✅ Crop journey created successfully!');
       setCropJourney(journey);
+      
+      // Save crop journey for alerts system
+      try {
+        sessionStorage.setItem('currentCropJourney', JSON.stringify(journey));
+        console.log('💾 Crop journey saved for alerts');
+      } catch (error) {
+        console.error('Error saving crop journey:', error);
+      }
+      
       setActiveTab('journey');
     } catch (error) {
       console.error('❌ Error creating crop journey:', error);

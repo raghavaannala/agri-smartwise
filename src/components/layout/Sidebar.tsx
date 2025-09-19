@@ -154,7 +154,7 @@ const sidebarItems: SidebarItem[] = [
 const Sidebar = () => {
   const { t, i18n } = useTranslation();
   const navigate = useNavigate();
-  const [collapsed, setCollapsed] = useState(false);
+  const [collapsed, setCollapsed] = useState(false); // Always expanded for better UX
   const [activeItem, setActiveItem] = useState<string | null>(() => {
     return sessionStorage.getItem("activeItem") || "Home";
   });
@@ -244,9 +244,9 @@ const Sidebar = () => {
   const sidebarRef = useRef(null);
 
   useEffect(() => {
-    // Close sidebar when navigating on mobile
+    // Handle mobile sidebar behavior
     if (isMobile) {
-      setCollapsed(true);
+      // On mobile, we use showMobileSidebar instead of collapsed
       // Listen for route changes to close mobile sidebar
       const handleRouteChange = () => {
         setShowMobileSidebar(false);
@@ -255,13 +255,8 @@ const Sidebar = () => {
       return () => {
         window.removeEventListener('popstate', handleRouteChange);
       };
-    } else {
-      // On desktop, use the stored preference or default to expanded
-      const storedCollapsed = localStorage.getItem('sidebarCollapsed');
-      if (storedCollapsed) {
-        setCollapsed(storedCollapsed === 'true');
-      }
     }
+    // Don't override desktop collapsed state here - let it use the initial state
   }, [isMobile]);
 
   const toggleSidebar = () => {
@@ -270,7 +265,6 @@ const Sidebar = () => {
     } else {
       const newCollapsedState = !collapsed;
       setCollapsed(newCollapsedState);
-      localStorage.setItem('sidebarCollapsed', String(newCollapsedState));
     }
   };
 

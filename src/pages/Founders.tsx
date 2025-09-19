@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import MainLayout from '@/components/layout/MainLayout';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
-import { Linkedin, Github, Mail, ExternalLink, Users, Award, Star, ChevronRight, Quote, ArrowRight, Briefcase, Code, PenTool, Sparkles, Clock, Leaf, TrendingUp, Check } from 'lucide-react';
+import { Linkedin, Github, Mail, ExternalLink, Users, Award, Star, ChevronRight, Quote, ArrowRight, Briefcase, Code, PenTool, Sparkles, Clock, Leaf, TrendingUp, Check, Database, Cpu, Megaphone, Settings } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { motion, useScroll, useTransform, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
@@ -149,6 +149,82 @@ const Founders = () => {
     }
   ];
 
+  // Team members data - now integrated as founders
+  const teamMembers = [
+    {
+      id: 'rajkumar-k',
+      name: 'Rajkumar.K',
+      role: 'Hardware Developer & Soil Lab Specialist',
+      bio: 'Developed innovative hardware components for soil lab analysis system, bringing precision agriculture technology to farmers.',
+      image: '/founders/Screenshot 2025-09-20 014434.png', // Placeholder for future image
+      linkedin: 'linkedin.com/in/raj-kumar-048688323', // Placeholder for LinkedIn profile
+      expertise: ['Hardware Development', 'Soil Analysis', 'IoT Sensors', 'Agricultural Technology'],
+      achievements: [
+        'Designed soil lab hardware architecture',
+        'Integrated sensor systems for real-time analysis',
+        'Optimized hardware for field conditions'
+      ],
+      department: 'Hardware & IoT',
+      color: 'from-purple-400 to-purple-600',
+      bgColor: 'bg-purple-50',
+      textColor: 'text-purple-800'
+    },
+    {
+      id: 'deekshith',
+      name: 'Deekshith.N',
+      role: 'Backend Developer & API Architect',
+      bio: 'Backend development expert who solved critical API integration issues and built robust server infrastructure for SmartAgroX.',
+      image: '/founders/image.png', // Placeholder for future image
+      linkedin: 'linkedin.com/in/deekshith-nanaveni-15a785326', // Placeholder for LinkedIn profile
+      expertise: ['Backend Development', 'API Design', 'Database Architecture', 'System Integration'],
+      achievements: [
+        'Resolved critical API integration challenges',
+        'Built scalable backend infrastructure',
+        'Optimized database performance'
+      ],
+      department: 'Backend & APIs',
+      color: 'from-blue-400 to-blue-600',
+      bgColor: 'bg-blue-50',
+      textColor: 'text-blue-800'
+    },
+    {
+      id: 'anji',
+      name: 'Anji',
+      role: 'Database Administrator & Data Architect',
+      bio: 'Database management specialist focused on data architecture optimization and ensuring reliable data storage for agricultural insights.',
+      image: '/founders/anji.jpg', // Placeholder for future image
+      linkedin: '#', // Placeholder for LinkedIn profile
+      expertise: ['Database Management', 'Data Architecture', 'Performance Optimization', 'Data Security'],
+      achievements: [
+        'Designed efficient database schemas',
+        'Implemented data backup and recovery systems',
+        'Optimized query performance for large datasets'
+      ],
+      department: 'Data Management',
+      color: 'from-green-400 to-green-600',
+      bgColor: 'bg-green-50',
+      textColor: 'text-green-800'
+    },
+    {
+      id: 'sushmitha-navashree',
+      name: 'Sushmitha & Navashree',
+      role: 'Community Evangelists & User Advocates',
+      bio: 'Community evangelists driving user adoption and engagement, building bridges between technology and farming communities.',
+      image: '/founders/evangelists.jpg', // Placeholder for future image
+      linkedin: '#', // Placeholder for LinkedIn profile
+      expertise: ['Community Building', 'User Engagement', 'Product Evangelism', 'Farmer Outreach'],
+      achievements: [
+        'Built strong farming community connections',
+        'Increased user adoption and engagement',
+        'Gathered valuable farmer feedback for product improvement'
+      ],
+      department: 'Community & Outreach',
+      color: 'from-pink-400 to-pink-600',
+      bgColor: 'bg-pink-50',
+      textColor: 'text-pink-800'
+    }
+  ];
+
   // Founder card component
   const FounderCard = ({ founder, isMainFounder = false, index }) => (
     <motion.div 
@@ -157,14 +233,14 @@ const Founders = () => {
       whileHover={{ y: -5, transition: { duration: 0.2 } }}
     >
       <Card className={`overflow-hidden border-gray-200 hover:shadow-xl transition-all h-full ${
-        isMainFounder 
+        founder.id === 'raghava-annala' 
           ? 'bg-gradient-to-br from-white via-white to-amber-50 border-amber-200' 
-          : 'bg-gradient-to-br from-white via-white to-green-50 border-green-100'
+          : 'bg-white'
       }`}>
-        {isMainFounder && (
+        {founder.id === 'raghava-annala' && (
           <div className="absolute top-0 right-0 bg-amber-400 text-white px-3 py-1 rounded-bl-lg font-medium text-sm flex items-center z-10">
             <Award className="h-3 w-3 mr-1" />
-            {t('founders.mainFounder')}
+            Main Founder
           </div>
         )}
         <div className="relative h-64 overflow-hidden">
@@ -180,9 +256,9 @@ const Founders = () => {
               target.style.display = 'none';
               const parent = target.parentElement;
               if (parent) {
-                parent.classList.add('bg-green-100', 'flex', 'items-center', 'justify-center');
+                parent.classList.add('bg-gray-100', 'flex', 'items-center', 'justify-center');
                 const initials = document.createElement('span');
-                initials.className = 'text-5xl font-bold text-green-600';
+                initials.className = 'text-5xl font-bold text-gray-600';
                 initials.textContent = founder.name.split(' ').map(n => n[0]).join('');
                 parent.appendChild(initials);
               }
@@ -201,18 +277,22 @@ const Founders = () => {
               {getRoleIcon(founder.role)}
               <span className="ml-1">{founder.role.split('&')[0].trim()}</span>
             </span>
-            {index === 0 && (
-              <span className="bg-amber-400/90 backdrop-blur-sm text-white text-xs font-medium px-2 py-1 rounded-full">
-                Founder
-              </span>
-            )}
+            <span className={`backdrop-blur-sm text-white text-xs font-medium px-2 py-1 rounded-full ${
+              founder.id === 'raghava-annala' ? 'bg-amber-400/90' : 'bg-blue-500/90'
+            }`}>
+              {founder.id === 'raghava-annala' ? 'Founder' : 'Co-Founder'}
+            </span>
           </div>
         </div>
 
         <CardHeader className="pb-1 pt-4">
-          <CardTitle className={`text-xl font-bold ${isMainFounder ? 'text-amber-800' : 'text-green-800'}`}>
+          <CardTitle className={`text-xl font-bold ${
+            founder.id === 'raghava-annala' ? 'text-amber-800' : 'text-gray-800'
+          }`}>
             {founder.name}
-            {isMainFounder && <Star className="inline-block ml-1 h-4 w-4 text-amber-500" />}
+            {founder.id === 'raghava-annala' && (
+              <Star className="inline-block ml-1 h-4 w-4 text-amber-500" />
+            )}
           </CardTitle>
           <CardDescription className="font-medium text-gray-600 flex items-center">
             {founder.role}
@@ -461,7 +541,7 @@ const Founders = () => {
               <TabsList className="bg-green-50 border border-green-100">
                 <TabsTrigger value="founders" className="data-[state=active]:bg-white">
                   <Users className="h-4 w-4 mr-2" />
-                  Our Team
+                  Founders
                 </TabsTrigger>
                 <TabsTrigger value="mission" className="data-[state=active]:bg-white">
                   <Award className="h-4 w-4 mr-2" />
@@ -475,21 +555,276 @@ const Founders = () => {
             </div>
             
             <TabsContent value="founders">
-              <motion.div 
-                className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8"
-                variants={containerVariants}
-                initial="hidden"
-                animate="visible"
-              >
-                {founders.map((founder, index) => (
-                  <FounderCard 
-                    key={founder.id} 
-                    founder={founder} 
-                    isMainFounder={founder.id === 'raghava-annala'}
-                    index={index}
-                  />
-                ))}
-              </motion.div>
+              <div className="text-center mb-8">
+                <motion.p 
+                  className="text-gray-600 max-w-3xl mx-auto text-lg"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ delay: 0.2, duration: 0.5 }}
+                >
+                  Meet our complete team of founders and contributors who make SmartAgroX possible
+                </motion.p>
+              </div>
+
+              {/* Horizontal Scrolling Container */}
+              <div className="relative">
+                <div 
+                  className="flex overflow-x-auto pb-6 gap-3 snap-x snap-mandatory"
+                  style={{ 
+                    scrollbarWidth: 'thin',
+                    scrollbarColor: '#d1d5db #f3f4f6'
+                  }}
+                >
+                  <style jsx>{`
+                    div::-webkit-scrollbar {
+                      height: 8px;
+                    }
+                    div::-webkit-scrollbar-track {
+                      background: #f3f4f6;
+                      border-radius: 4px;
+                    }
+                    div::-webkit-scrollbar-thumb {
+                      background: #d1d5db;
+                      border-radius: 4px;
+                    }
+                    div::-webkit-scrollbar-thumb:hover {
+                      background: #9ca3af;
+                    }
+                  `}</style>
+                  
+                  {/* Original Founders */}
+                  {founders.map((founder, index) => (
+                    <motion.div
+                      key={founder.id}
+                      initial={{ opacity: 0, x: 50 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: index * 0.1, duration: 0.5 }}
+                      className="flex-shrink-0 w-80 snap-start"
+                    >
+                      <Card className={`h-full overflow-hidden border-gray-200 hover:shadow-xl transition-all relative ${
+                        founder.id === 'raghava-annala' 
+                          ? 'bg-gradient-to-br from-white via-white to-amber-50 border-amber-200' 
+                          : 'bg-white'
+                      }`}>
+                        {founder.id === 'raghava-annala' && (
+                          <div className="absolute top-0 right-0 bg-amber-400 text-white px-3 py-1 rounded-bl-lg font-medium text-sm flex items-center z-10">
+                            <Award className="h-3 w-3 mr-1" />
+                            Main Founder
+                          </div>
+                        )}
+                        
+                        <div className="relative h-64 overflow-hidden">
+                          <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-black/30"></div>
+                          <img 
+                            src={founder.image} 
+                            alt={founder.name}
+                            className="w-full h-full object-cover object-center transition-transform hover:scale-105"
+                            style={{ objectPosition: 'center' }}
+                            onError={(e) => {
+                              const target = e.target as HTMLImageElement;
+                              target.style.display = 'none';
+                              const parent = target.parentElement;
+                              if (parent) {
+                                parent.classList.add('bg-gray-100', 'flex', 'items-center', 'justify-center');
+                                const initials = document.createElement('span');
+                                initials.className = 'text-5xl font-bold text-gray-600';
+                                initials.textContent = founder.name.split(' ').map(n => n[0]).join('');
+                                parent.appendChild(initials);
+                              }
+                            }}
+                          />
+                          
+                          <div className="absolute bottom-0 left-0 right-0 p-3 flex items-center justify-between">
+                            <span className="bg-white/90 backdrop-blur-sm text-xs font-medium px-2 py-1 rounded-full flex items-center">
+                              {getRoleIcon(founder.role)}
+                              <span className="ml-1">{founder.role.split('&')[0].trim()}</span>
+                            </span>
+                            <span className={`backdrop-blur-sm text-white text-xs font-medium px-2 py-1 rounded-full ${
+                              founder.id === 'raghava-annala' ? 'bg-amber-400/90' : 'bg-blue-500/90'
+                            }`}>
+                              {founder.id === 'raghava-annala' ? 'Founder' : 'Co-Founder'}
+                            </span>
+                          </div>
+                        </div>
+
+                        <CardHeader className="pb-1 pt-4">
+                          <CardTitle className={`text-xl font-bold ${
+                            founder.id === 'raghava-annala' ? 'text-amber-800' : 'text-gray-800'
+                          }`}>
+                            {founder.name}
+                            {founder.id === 'raghava-annala' && (
+                              <Star className="inline-block ml-1 h-4 w-4 text-amber-500" />
+                            )}
+                          </CardTitle>
+                          <CardDescription className="font-medium text-gray-600 text-sm">
+                            {founder.role}
+                          </CardDescription>
+                        </CardHeader>
+
+                        <CardContent className="pb-2">
+                          <p className="text-gray-600 text-sm mb-4">{founder.bio}</p>
+                          
+                          {/* LinkedIn button */}
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            className="flex items-center text-blue-600 hover:text-blue-700 border-blue-100 hover:border-blue-200 hover:bg-blue-50 mb-4 w-full justify-center"
+                            onClick={() => window.open(founder.linkedin, '_blank')}
+                          >
+                            <Linkedin className="h-4 w-4 mr-1" />
+                            Connect on LinkedIn
+                          </Button>
+                          
+                          {/* Achievements section */}
+                          {founder.achievements && (
+                            <div className="mb-4">
+                              <h4 className="text-sm font-semibold text-gray-700 mb-2">Key Achievements</h4>
+                              <ul className="text-sm text-gray-600 space-y-2">
+                                {founder.achievements.map((achievement, index) => (
+                                  <li key={index} className="flex items-start">
+                                    <Star className="h-3 w-3 text-amber-500 mr-2 mt-1 flex-shrink-0" />
+                                    <span>{achievement}</span>
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
+                          )}
+                          
+                          {/* Expertise tags */}
+                          {founder.expertise && (
+                            <div>
+                              <h4 className="text-sm font-semibold text-gray-700 mb-2">Expertise</h4>
+                              <div className="flex flex-wrap gap-1">
+                                {founder.expertise.map((skill, index) => (
+                                  <Badge key={index} variant="secondary" className="bg-green-50 text-green-700 border-green-100">
+                                    {skill}
+                                  </Badge>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </CardContent>
+                      </Card>
+                    </motion.div>
+                  ))}
+                  
+                  {/* Team Members */}
+                  {teamMembers.map((member, index) => (
+                    <motion.div
+                      key={member.id}
+                      initial={{ opacity: 0, x: 50 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: (founders.length + index) * 0.1, duration: 0.5 }}
+                      className="flex-shrink-0 w-72 snap-start"
+                    >
+                      <Card className="h-full overflow-hidden border-gray-200 hover:shadow-xl transition-all bg-white relative">
+                        {member.id === 'rajkumar-k' && (
+                          <div className="absolute top-0 right-0 bg-purple-400 text-white px-3 py-1 rounded-bl-lg font-medium text-sm flex items-center z-10">
+                          </div>
+                        )}
+                        
+                        <div className={`h-2 bg-gradient-to-r ${member.color}`}></div>
+                        
+                        <div className="relative h-64 overflow-hidden">
+                          <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-black/30"></div>
+                          <img 
+                            src={member.image} 
+                            alt={member.name}
+                            className="w-full h-full object-cover object-center transition-transform hover:scale-105"
+                            style={{ objectPosition: 'center' }}
+                            onError={(e) => {
+                              const target = e.target as HTMLImageElement;
+                              target.style.display = 'none';
+                              const parent = target.parentElement;
+                              if (parent) {
+                                parent.classList.add(member.bgColor, 'flex', 'items-center', 'justify-center');
+                                const initials = document.createElement('span');
+                                initials.className = `text-5xl font-bold ${member.textColor}`;
+                                initials.textContent = member.name.split(' ').map(n => n[0]).join('');
+                                parent.appendChild(initials);
+                              }
+                            }}
+                          />
+                          
+                          <div className="absolute bottom-0 left-0 right-0 p-3 flex items-center justify-between">
+                            <span className="bg-white/90 backdrop-blur-sm text-xs font-medium px-2 py-1 rounded-full flex items-center">
+                              {member.id === 'rajkumar-k' && <Cpu className="h-3 w-3 mr-1" />}
+                              {member.id === 'deekshith' && <Code className="h-3 w-3 mr-1" />}
+                              {member.id === 'anji' && <Database className="h-3 w-3 mr-1" />}
+                              {member.id === 'sushmitha-navashree' && <Megaphone className="h-3 w-3 mr-1" />}
+                              <span className="ml-1">{member.department}</span>
+                            </span>
+                            <Badge variant="outline" className="bg-white/90 text-gray-800 border-white text-xs">
+                              Team Member
+                            </Badge>
+                          </div>
+                        </div>
+
+                        <CardHeader className="pb-1 pt-4">
+                          <CardTitle className="text-xl font-bold text-gray-800">
+                            {member.name}
+                          </CardTitle>
+                          <CardDescription className="font-medium text-gray-600 text-sm">
+                            {member.role}
+                          </CardDescription>
+                        </CardHeader>
+
+                        <CardContent className="pb-2">
+                          <p className="text-gray-600 text-sm mb-4">{member.bio}</p>
+                          
+                          {/* LinkedIn button */}
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            className="flex items-center text-blue-600 hover:text-blue-700 border-blue-100 hover:border-blue-200 hover:bg-blue-50 mb-4 w-full justify-center"
+                            onClick={() => window.open(member.linkedin, '_blank')}
+                          >
+                            <Linkedin className="h-4 w-4 mr-1" />
+                            Connect on LinkedIn
+                          </Button>
+                          
+                          {/* Achievements section */}
+                          {member.achievements && (
+                            <div className="mb-4">
+                              <h4 className="text-sm font-semibold text-gray-700 mb-2">Key Achievements</h4>
+                              <ul className="text-sm text-gray-600 space-y-2">
+                                {member.achievements.map((achievement, index) => (
+                                  <li key={index} className="flex items-start">
+                                    <Star className="h-3 w-3 text-amber-500 mr-2 mt-1 flex-shrink-0" />
+                                    <span>{achievement}</span>
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
+                          )}
+                          
+                          {/* Expertise tags */}
+                          {member.expertise && (
+                            <div>
+                              <h4 className="text-sm font-semibold text-gray-700 mb-2">Expertise</h4>
+                              <div className="flex flex-wrap gap-1">
+                                {member.expertise.map((skill, index) => (
+                                  <Badge key={index} variant="secondary" className="bg-green-50 text-green-700 border-green-100">
+                                    {skill}
+                                  </Badge>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </CardContent>
+                      </Card>
+                    </motion.div>
+                  ))}
+                </div>
+                
+                {/* Scroll Indicators */}
+                <div className="flex justify-center mt-4 space-x-2">
+                  <div className="flex items-center text-sm text-gray-500">
+                    <ChevronRight className="h-4 w-4 mr-1" />
+                    Scroll to see all team members
+                  </div>
+                </div>
+              </div>
             </TabsContent>
             
             <TabsContent value="mission">
