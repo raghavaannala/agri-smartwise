@@ -64,6 +64,17 @@ const sidebarItems: SidebarItem[] = [
     category: 'main'
   },
   { 
+    name: 'AgriBuddy', 
+    icon: Sprout, 
+    href: '/agribuddy',
+    color: 'bg-gradient-to-r from-green-500/30 to-blue-500/30 text-green-700 border-2 border-green-300/50',
+    translationKey: 'common.agriBuddy',
+    category: 'main',
+    featured: true,
+    badge: '🚀 NEW',
+    description: '🤖 AI Crop Journey Assistant - Your Smart Farming Companion',
+  },
+  { 
     name: 'Farm', 
     icon: MapPin, 
     href: '/farm',

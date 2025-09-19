@@ -33,7 +33,17 @@
     "cropAdvisor": "Crop Advisor",
     "overview": "Overview",
     "viewFullReport": "View Full Report",
-    "help": "Help"
+    "help": "Help",
+    "notifications": "Notifications",
+    "weatherForecast": "Weather Forecast",
+    "rainExpected": "Rain Expected",
+    "marketPrices": "Market Prices",
+    "priceIncrease": "Price Increase",
+    "diseaseDetection": "Disease Detection",
+    "fungalInfection": "Fungal Infection",
+    "myAccount": "My Account",
+    "farmDetails": "Farm Details",
+    "agriBuddy": "AgriBuddy"
   },
   "founders": {
     "title": "Meet Our Founders",
@@ -275,7 +285,8 @@
     "thinking": "Thinking...",
     "errorMessage": "I'm sorry, I couldn't process your request. Please try again later.",
     "botName": "GrowthGuide AI",
-    "inputPlaceholder": "Ask me anything about farming..."
+    "inputPlaceholder": "Ask me anything about farming...",
+    "toggle": "Toggle AgriBot"
   },
   "voiceAssistant": {
     "title": "Voice Assistant",
@@ -323,5 +334,14 @@
     "timeRange": "Time Range",
     "fieldSummary": "Field Summary",
     "drawFields": "Draw field boundaries on the map to generate NDVI analysis"
+  },
+  "sidebar": {
+    "categories": {
+      "main": "Main",
+      "tools": "Tools", 
+      "info": "Information"
+    },
+    "featured": "Featured",
+    "meetTeam": "Meet our team"
   }
 }

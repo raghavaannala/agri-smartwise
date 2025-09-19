@@ -17,6 +17,7 @@ import { getDownloadURL, ref, uploadBytesResumable } from 'firebase/storage';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
+import { Lightbulb } from 'lucide-react';
 
 const Farm = () => {
   console.log('============= Farm component rendering - Step 2 =============');
@@ -261,6 +262,42 @@ const Farm = () => {
     }
   };
   
+  // Function to compress image before storing
+  const compressImage = (file: File, maxWidth: number = 800, quality: number = 0.8): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      const img = new Image();
+      
+      img.onload = () => {
+        // Calculate new dimensions
+        let { width, height } = img;
+        
+        if (width > maxWidth) {
+          height = (height * maxWidth) / width;
+          width = maxWidth;
+        }
+        
+        // Set canvas size
+        canvas.width = width;
+        canvas.height = height;
+        
+        // Draw and compress
+        ctx?.drawImage(img, 0, 0, width, height);
+        
+        // Convert to compressed data URL
+        const compressedDataUrl = canvas.toDataURL('image/jpeg', quality);
+        console.log(`Image compressed: ${file.size} bytes -> ${Math.round(compressedDataUrl.length * 0.75)} bytes`);
+        resolve(compressedDataUrl);
+      };
+      
+      img.onerror = reject;
+      
+      // Create object URL for the image
+      img.src = URL.createObjectURL(file);
+    });
+  };
+
   // Handle image upload
   const handleUploadImage = async () => {
     if (!selectedFarm || !selectedFile) {
@@ -306,8 +343,14 @@ const Farm = () => {
       setUploadingImage(true);
       setUploadProgress(1); // Start with 1% to show something is happening
       
-      // Always use direct upload to bypass Firebase storage issues
-      await handleDirectUpload();
+      // Compress the image before uploading
+      const compressedDataUrl = await compressImage(selectedFile);
+      
+      // Use the compressed data URL directly
+      await updateFarmWithNewImage(compressedDataUrl);
+      
+      setUploadProgress(100);
+      console.log("Image upload completed successfully");
     } catch (error) {
       console.error("Error initializing upload:", error);
       setUploadError("Failed to start upload process. Please try again.");
@@ -320,68 +363,7 @@ const Farm = () => {
       setUploadProgress(0);
     }
   };
-  
-  // Direct upload method (fallback)
-  const handleDirectUpload = async () => {
-    if (!selectedFarm || !selectedFile) return;
-    
-    try {
-      console.log("Starting direct upload method");
-      
-      // Create a unique filename
-      const timestamp = new Date().getTime();
-      const sanitizedFilename = selectedFile.name.replace(/[^a-zA-Z0-9.]/g, '_');
-      const uniqueFilename = `farm_image_${timestamp}_${sanitizedFilename}`;
-      
-      // Create a simulated upload URL that would normally come from your server
-      // In a real implementation, you would upload to your server and get a real URL
-      const simulatedServerUrl = `https://smartagrox-images.example.com/farms/${selectedFarm.id}/${uniqueFilename}`;
-      
-      // Simulate upload progress in steps
-      const totalSteps = 20; // 20 steps to reach 100%
-      const stepSize = 100 / totalSteps;
-      
-      console.log("Simulating upload with steps:", totalSteps);
-      
-      for (let step = 1; step <= totalSteps; step++) {
-        // Set progress with a small delay between steps to simulate network activity
-        await new Promise(resolve => setTimeout(resolve, 150));
-        const currentProgress = Math.min(step * stepSize, 99); // Cap at 99% until complete
-        console.log(`Upload progress step ${step}/${totalSteps}: ${currentProgress.toFixed(1)}%`);
-        setUploadProgress(currentProgress);
-      }
-      
-      // Final step - simulate server processing time
-      console.log("Upload completed, processing image...");
-      await new Promise(resolve => setTimeout(resolve, 500));
-      setUploadProgress(100);
-      
-      console.log("Image processed successfully, URL:", simulatedServerUrl);
-      
-      // Generate a data URL from the selected file to use as a real image source
-      // This allows us to actually display the uploaded image
-      const fileReader = new FileReader();
-      const dataUrlPromise = new Promise<string>((resolve, reject) => {
-        fileReader.onload = () => resolve(fileReader.result as string);
-        fileReader.onerror = reject;
-      });
-      fileReader.readAsDataURL(selectedFile);
-      
-      // Wait for data URL to be ready
-      const dataUrl = await dataUrlPromise;
-      console.log("Generated data URL for image");
-      
-      // Use the actual data URL instead of the simulated URL
-      await updateFarmWithNewImage(dataUrl);
-      
-      console.log("Farm updated with new image data URL");
-    } catch (error) {
-      console.error("Direct upload error:", error);
-      setUploadError("Failed to process image. Please try again.");
-      setUploadingImage(false);
-    }
-  };
-  
+
   // Update farm with new image URL (common code for both upload methods)
   const updateFarmWithNewImage = async (imageUrl: string) => {
     if (!selectedFarm || !selectedFarm.id) return;
@@ -390,6 +372,10 @@ const Farm = () => {
       const updatedImageUrls = [...(selectedFarm.imageUrls || []), imageUrl];
       
       console.log("Updating farm with new image URL");
+      console.log("Current imageUrls count:", selectedFarm.imageUrls?.length || 0);
+      console.log("New imageUrls count:", updatedImageUrls.length);
+      console.log("Image URL preview:", imageUrl.substring(0, 100) + "...");
+      
       await updateFarmData(selectedFarm.id, {
         imageUrls: updatedImageUrls,
       });
@@ -400,12 +386,14 @@ const Farm = () => {
         ...selectedFarm,
         imageUrls: updatedImageUrls
       };
-          setSelectedFarm(updatedFarm);
+      setSelectedFarm(updatedFarm);
       
       // Update farms list
       setFarms(farms.map(farm => 
         farm.id === selectedFarm.id ? updatedFarm : farm
       ));
+      
+      console.log("Local state updated with new image URLs:", updatedImageUrls.length);
       
       toast({
         title: "Upload Complete",
@@ -450,8 +438,13 @@ const Farm = () => {
       
       let analyzedFarm;
       if (auth?.currentUser && !selectedFarm.id.startsWith('demo-farm-')) {
-        // Real user with saved farm - use Firestore analysis
-        analyzedFarm = await analyzeFarmData(selectedFarm.id);
+        // Real user with saved farm - use Firestore analysis with latest image
+        const latestImageUrl = selectedFarm.imageUrls && selectedFarm.imageUrls.length > 0 
+          ? selectedFarm.imageUrls[selectedFarm.imageUrls.length - 1] 
+          : undefined;
+        
+        console.log('Using image URL for AI analysis:', latestImageUrl ? 'Image available' : 'No image available');
+        analyzedFarm = await analyzeFarmData(selectedFarm.id, latestImageUrl);
       } else {
         // Demo mode or demo farm - generate mock analysis
         analyzedFarm = {
@@ -515,6 +508,80 @@ const Farm = () => {
     setShowDetailedAnalysis(!showDetailedAnalysis);
   };
 
+  // Function to format analysis text for better display
+  const formatAnalysisText = (text: string) => {
+    if (!text) return null;
+    
+    // Split text into sections and format
+    const sections = text.split('\n\n');
+    
+    return sections.map((section, index) => {
+      // Handle headers (text with **)
+      if (section.includes('**')) {
+        const parts = section.split('**');
+        return (
+          <div key={index} className="mb-4">
+            {parts.map((part, partIndex) => {
+              if (partIndex % 2 === 1) {
+                // This is bold text
+                return <strong key={partIndex} className="text-gray-800 font-semibold">{part}</strong>;
+              } else if (part.trim()) {
+                // Regular text
+                return <span key={partIndex}>{part}</span>;
+              }
+              return null;
+            })}
+          </div>
+        );
+      }
+      
+      // Handle bullet points
+      if (section.includes('*') && !section.includes('**')) {
+        const lines = section.split('\n');
+        const bulletPoints = lines.filter(line => line.trim().startsWith('*'));
+        const otherText = lines.filter(line => !line.trim().startsWith('*')).join(' ');
+        
+        return (
+          <div key={index} className="mb-4">
+            {otherText && <p className="mb-2 text-gray-700">{otherText}</p>}
+            {bulletPoints.length > 0 && (
+              <ul className="space-y-1 ml-4">
+                {bulletPoints.map((point, pointIndex) => (
+                  <li key={pointIndex} className="text-sm text-gray-600 flex items-start gap-2">
+                    <div className="w-1.5 h-1.5 rounded-full bg-green-400 mt-2 flex-shrink-0"></div>
+                    {point.replace(/^\*\s*/, '')}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        );
+      }
+      
+      // Handle numbered points
+      if (/^\d+\./.test(section.trim())) {
+        return (
+          <div key={index} className="mb-4">
+            <div className="bg-blue-50 rounded-lg p-3 border-l-4 border-blue-200">
+              <p className="text-sm text-gray-700 font-medium">{section}</p>
+            </div>
+          </div>
+        );
+      }
+      
+      // Regular paragraph
+      if (section.trim()) {
+        return (
+          <p key={index} className="mb-3 text-sm text-gray-700 leading-relaxed">
+            {section}
+          </p>
+        );
+      }
+      
+      return null;
+    });
+  };
+
   // Add a function to handle farm deletion
   const handleDeleteFarm = async () => {
     if (!farmToDelete || !farmToDelete.id) {
@@ -543,6 +610,7 @@ const Farm = () => {
           setSelectedFarm(null);
         }
       }
+    
       
       toast({
         title: "Farm Deleted",
@@ -564,60 +632,56 @@ const Farm = () => {
     }
   };
 
-  // Error UI
-  if (authError) {
-    return (
-      <MainLayout>
-        <div className="container mx-auto p-4">
-          <Alert variant="destructive" className="mb-6">
-            <AlertTriangle className="h-4 w-4" />
-            <AlertTitle>Authentication Error</AlertTitle>
-            <AlertDescription>{authError}</AlertDescription>
-          </Alert>
-          <Button onClick={() => window.location.reload()}>Refresh Page</Button>
-        </div>
-      </MainLayout>
-    );
-  }
-
-  // Main component UI
-    return (
-      <MainLayout>
-      <div className="container mx-auto p-4">
-        <div className="flex justify-between items-center mb-6">
-          <div>
-            <h1 className="text-2xl font-bold">Farm Management</h1>
-            {!auth?.currentUser && (
-              <p className="text-sm text-gray-600 mt-1">Demo Mode - Sign in to save your farms permanently</p>
-            )}
+  return (
+    <>
+      {authError ? (
+        <MainLayout>
+          <div className="container mx-auto p-4">
+            <Alert variant="destructive" className="mb-6">
+              <AlertTriangle className="h-4 w-4" />
+              <AlertTitle>Authentication Error</AlertTitle>
+              <AlertDescription>{authError}</AlertDescription>
+            </Alert>
+            <Button onClick={() => window.location.reload()}>Refresh Page</Button>
           </div>
-            <Button 
-            className="bg-green-600 hover:bg-green-700"
-            onClick={() => setShowNewFarmDialog(true)}
-            >
-            <Plus className="h-4 w-4 mr-2" />
-            Add Farm
-            </Button>
-          </div>
-        
-        {/* Loading state */}
-        {loading ? (
-          <div className="flex justify-center items-center p-12">
-            <Loader2 className="h-8 w-8 animate-spin text-gray-500" />
-            <span className="ml-3 text-gray-500">Loading farm data...</span>
-            </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
-            {/* Farms list sidebar */}
-            <div className="md:col-span-3">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Your Farms</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {farms.length === 0 ? (
-                    <div className="text-center py-6">
-                      <p className="text-gray-500 mb-4">No farms yet</p>
+        </MainLayout>
+      ) : (
+        <MainLayout>
+          <div className="container mx-auto p-4">
+            <div className="flex justify-between items-center mb-6">
+              <div>
+                <h1 className="text-2xl font-bold">Farm Management</h1>
+                {!auth?.currentUser && (
+                  <p className="text-sm text-gray-600 mt-1">Demo Mode - Sign in to save your farms permanently</p>
+                )}
+              </div>
+                <Button 
+                className="bg-green-600 hover:bg-green-700"
+                onClick={() => setShowNewFarmDialog(true)}
+                >
+                <Plus className="h-4 w-4 mr-2" />
+                Add Farm
+                </Button>
+              </div>
+            
+            {/* Loading state */}
+            {loading ? (
+              <div className="flex justify-center items-center p-12">
+                <Loader2 className="h-8 w-8 animate-spin text-gray-500" />
+                <span className="ml-3 text-gray-500">Loading farm data...</span>
+                </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
+                {/* Farms list sidebar */}
+                <div className="md:col-span-3">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Your Farms</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      {farms.length === 0 ? (
+                        <div className="text-center py-6">
+                          <p className="text-gray-500 mb-4">No farms yet</p>
                 <Button 
                         className="bg-green-600 hover:bg-green-700"
                         onClick={() => setShowNewFarmDialog(true)}
@@ -626,38 +690,38 @@ const Farm = () => {
                         Add Your First Farm
                 </Button>
               </div>
-                  ) : (
-                    <div className="space-y-2">
-                      {farms.map(farm => (
-                        <div 
-                          key={farm.id} 
-                          className={`flex justify-between items-center p-3 rounded-lg cursor-pointer transition-colors ${
-                            selectedFarm?.id === farm.id ? 'bg-green-100 border-green-300' : 'hover:bg-gray-100 border-transparent'
-                          } border mb-2`}
-                          onClick={() => handleSelectFarm(farm)}
-                        >
-                          <div className="flex-1 truncate">
-                            <h3 className="font-medium">{farm.name}</h3>
-                            <p className="text-xs text-gray-500">{farm.location} • {farm.size} hectares</p>
+                      ) : (
+                        <div className="space-y-2">
+                          {farms.map(farm => (
+                            <div 
+                              key={farm.id} 
+                              className={`flex justify-between items-center p-3 rounded-lg cursor-pointer transition-colors ${
+                                selectedFarm?.id === farm.id ? 'bg-green-100 border-green-300' : 'hover:bg-gray-100 border-transparent'
+                              } border mb-2`}
+                              onClick={() => handleSelectFarm(farm)}
+                            >
+                              <div className="flex-1 truncate">
+                                <h3 className="font-medium">{farm.name}</h3>
+                                <p className="text-xs text-gray-500">{farm.location} • {farm.size} hectares</p>
                 </div>
-                          <button
-                            className="p-1 text-gray-500 hover:text-red-500 transition-colors"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setFarmToDelete(farm);
-                              setShowDeleteFarmDialog(true);
-                            }}
-                            aria-label="Delete farm"
-                          >
-                            <X className="h-4 w-4" />
-                          </button>
+                              <button
+                                className="p-1 text-gray-500 hover:text-red-500 transition-colors"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setFarmToDelete(farm);
+                                  setShowDeleteFarmDialog(true);
+                                }}
+                                aria-label="Delete farm"
+                              >
+                                <X className="h-4 w-4" />
+                              </button>
+                              </div>
+                          ))}
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
                 </div>
-                      ))}
-            </div>
-          )}
-                </CardContent>
-              </Card>
-              </div>
               
             {/* Main content area */}
             <div className="md:col-span-9">
@@ -723,8 +787,24 @@ const Farm = () => {
                             >
                           <img 
                             src={url} 
-                                alt={`Farm ${index + 1}`} 
-                                className="w-full h-full object-cover"
+                            alt={`Farm image ${index + 1}`} 
+                            className="w-full h-full object-cover"
+                            onError={(e) => {
+                              console.error('Image failed to load:', url);
+                              const target = e.target as HTMLImageElement;
+                              target.style.display = 'none';
+                              // Show a placeholder or error message
+                              const parent = target.parentElement;
+                              if (parent && !parent.querySelector('.image-error')) {
+                                const errorDiv = document.createElement('div');
+                                errorDiv.className = 'image-error flex flex-col items-center justify-center h-full bg-gray-100 text-gray-500 text-xs p-2';
+                                errorDiv.innerHTML = '<div class="text-center"><svg class="h-8 w-8 mx-auto mb-1" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z" clip-rule="evenodd"></path></svg><div>Image failed to load</div></div>';
+                                parent.appendChild(errorDiv);
+                              }
+                            }}
+                            onLoad={() => {
+                              console.log('Image loaded successfully:', url.substring(0, 50) + '...');
+                            }}
                           />
                         </div>
                       ))
@@ -764,117 +844,128 @@ const Farm = () => {
                       )}
                 </div>
                     
-                    {/* Analysis Results Section - only show if analysis exists */}
-                    {selectedFarm.analysis && (
-                      <div className="mt-6 border-t pt-4">
-                        <h3 className="text-lg font-semibold mb-4">Farm Analysis Results</h3>
-                        
-                        {/* Analysis Score Cards */}
-                        <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-6">
-                          <div className="bg-green-50 rounded-lg p-3 text-center">
-                            <div className="flex justify-center mb-1 text-green-600">
-                              <ImageIcon className="h-5 w-5" />
-              </div>
-                            <div className="text-2xl font-bold text-green-700">
-                              {selectedFarm.analysis.soilHealth}%
-            </div>
-                            <div className="text-xs text-green-600">Soil Health</div>
+                    {/* AI Analysis Summary Card */}
+                    <Card className="mb-6">
+                      <CardHeader className="pb-4">
+                        <CardTitle className="flex items-center gap-2">
+                          <Activity className="h-5 w-5 text-green-600" />
+                          AI Analysis Summary
+                          {selectedFarm.lastAnalyzed && (
+                            <Badge variant="outline" className="ml-auto text-xs">
+                              {new Date(selectedFarm.lastAnalyzed.seconds * 1000).toLocaleDateString()}
+                            </Badge>
+                          )}
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent className="space-y-6">
+                        {/* Detailed Analysis Text */}
+                        <div className="bg-gray-50 rounded-lg p-4">
+                          <h4 className="text-sm font-semibold mb-3 text-gray-800">Farm Assessment</h4>
+                          <div className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">
+                            {formatAnalysisText(selectedFarm.analysis?.detailedAnalysis)}
+                          </div>
+                        </div>
+                    
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                          {/* Key Recommendations */}
+                          <div className="bg-blue-50 rounded-lg p-4">
+                            <h4 className="text-sm font-semibold mb-3 text-blue-800 flex items-center gap-2">
+                              <Lightbulb className="h-4 w-4" />
+                              Key Recommendations
+                            </h4>
+                            <ul className="space-y-2">
+                              {selectedFarm.analysis?.recommendations?.slice(0, 4).map((rec, index) => (
+                                <li key={index} className="text-sm text-blue-700 flex items-start gap-2">
+                                  <div className="w-1.5 h-1.5 rounded-full bg-blue-400 mt-2 flex-shrink-0"></div>
+                                  {rec}
+                                </li>
+                              )) || (
+                                <li className="text-sm text-blue-600 italic">
+                                  No recommendations available. Click "Analyze Farm" to generate AI-powered insights.
+                                </li>
+                              )}
+                              {selectedFarm.analysis?.recommendations && selectedFarm.analysis.recommendations.length > 4 && (
+                                <li className="text-xs text-blue-600 italic pl-4">
+                                  + {selectedFarm.analysis.recommendations.length - 4} more recommendations in detailed view
+                                </li>
+                              )}
+                            </ul>
                           </div>
                           
-                          <div className="bg-amber-50 rounded-lg p-3 text-center">
-                            <div className="flex justify-center mb-1 text-amber-600">
-                              <Leaf className="h-5 w-5" />
+                          {/* Recommended Crops */}
+                          <div className="bg-green-50 rounded-lg p-4">
+                            <h4 className="text-sm font-semibold mb-3 text-green-800 flex items-center gap-2">
+                              <Sprout className="h-4 w-4" />
+                              Recommended Crops
+                            </h4>
+                            <div className="flex flex-wrap gap-2">
+                              {selectedFarm.analysis?.recommendedCrops?.map((crop, index) => (
+                                <Badge key={index} variant="outline" className="bg-green-100 text-green-700 border-green-200">
+                                  {crop}
+                                </Badge>
+                              ))}
                             </div>
-                            <div className="text-2xl font-bold text-amber-700">
-                              {selectedFarm.analysis.cropHealth}%
-                            </div>
-                            <div className="text-xs text-amber-600">Crop Health</div>
+                            {selectedFarm.analysis?.recommendedCrops?.length === 0 && (
+                              <p className="text-sm text-green-600 italic">No specific crop recommendations available</p>
+                            )}
                           </div>
-                          
-                          <div className="bg-blue-50 rounded-lg p-3 text-center">
-                            <div className="flex justify-center mb-1 text-blue-600">
-                              <Droplets className="h-5 w-5" />
-            </div>
-                            <div className="text-2xl font-bold text-blue-700">
-                              {selectedFarm.analysis.waterManagement}%
-                            </div>
-                            <div className="text-xs text-blue-600">Water Management</div>
-          </div>
+                        </div>
 
-                          <div className="bg-red-50 rounded-lg p-3 text-center">
-                            <div className="flex justify-center mb-1 text-red-600">
-                              <Bug className="h-5 w-5" />
-                  </div>
-                            <div className="text-2xl font-bold text-red-700">
-                              {selectedFarm.analysis.pestRisk}%
-                      </div>
-                            <div className="text-xs text-red-600">Pest Risk</div>
-                        </div>
-                          
-                          <div className="bg-purple-50 rounded-lg p-3 text-center">
-                            <div className="flex justify-center mb-1 text-purple-600">
-                              <BarChart3 className="h-5 w-5" />
-                        </div>
-                            <div className="text-2xl font-bold text-purple-700">
-                              {selectedFarm.analysis.overallScore}%
-                        </div>
-                            <div className="text-xs text-purple-600">Overall Score</div>
-                      </div>
-                    </div>
-                    
-                        {/* Analysis summary card */}
-                        <Card className="mb-6">
-                          <CardContent className="pt-6">
-                            <div className="text-sm text-gray-700 mb-4">
-                              {selectedFarm.analysis.detailedAnalysis?.substring(0, 200)}...
-                    </div>
-                    
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                              {/* Recommendations */}
-                              <div>
-                                <h4 className="text-md font-semibold mb-2">Key Recommendations</h4>
-                                <ul className="space-y-1 list-disc pl-5">
-                                  {selectedFarm.analysis.recommendations.slice(0, 3).map((rec, index) => (
-                                    <li key={index} className="text-sm text-gray-700">{rec}</li>
-                                  ))}
-                                  {selectedFarm.analysis.recommendations.length > 3 && (
-                                    <li className="text-sm text-gray-500 italic">
-                                      + {selectedFarm.analysis.recommendations.length - 3} more recommendations
-                                    </li>
-                                  )}
-                                </ul>
-                    </div>
+                        {/* Analysis Insights Grid */}
+                        {selectedFarm.analysis?.detailedAnalysis && (
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div className="bg-amber-50 rounded-lg p-4 text-center">
+                              <div className="text-2xl font-bold text-amber-700 mb-1">
+                                {selectedFarm.analysis?.soilHealth || 0}%
+                              </div>
+                              <Progress 
+                                value={selectedFarm.analysis?.soilHealth || 0} 
+                                className="h-2 mb-4" 
+                              />
                               
-                              {/* Recommended crops */}
-                              <div>
-                                <h4 className="text-md font-semibold mb-2">Recommended Crops</h4>
-                                <div className="flex flex-wrap gap-2">
-                                  {selectedFarm.analysis.recommendedCrops?.map((crop, index) => (
-                                    <Badge key={index} variant="outline" className="bg-green-50">
-                                      <Sprout className="h-3 w-3 mr-1" />
-                                      {crop}
-                                    </Badge>
-                                  ))}
-                  </div>
-              </div>
+                              <div className="text-xs text-amber-600 mt-1">
+                                {(selectedFarm.analysis?.soilHealth || 0) >= 80 ? 'Excellent' : 
+                                 (selectedFarm.analysis?.soilHealth || 0) >= 60 ? 'Good' : 
+                                 (selectedFarm.analysis?.soilHealth || 0) >= 40 ? 'Fair' : 'Needs Attention'}
+                              </div>
                             </div>
-                </CardContent>
-              </Card>
-
-                        {/* View detailed analysis button */}
-                        <div className="text-center">
-                  <Button 
-                  variant="outline" 
-                            className="bg-green-50 hover:bg-green-100 text-green-700 border-green-200"
-                            onClick={toggleDetailedAnalysis}
-                >
-                            <Activity className="h-4 w-4 mr-2" />
-                            View Detailed Analysis
-                  </Button>
-              </div>
-                  </div>
-                )}
-                
+                            
+                            <div className="bg-green-50 rounded-lg p-4 text-center">
+                              <div className="text-2xl font-bold text-green-700 mb-1">
+                                {selectedFarm.analysis?.cropHealth || 0}%
+                              </div>
+                              <Progress 
+                                value={selectedFarm.analysis?.cropHealth || 0} 
+                                className="h-2 mb-4" 
+                              />
+                              
+                              <div className="text-xs text-green-600 mt-1">
+                                {(selectedFarm.analysis?.cropHealth || 0) >= 80 ? 'Excellent' : 
+                                 (selectedFarm.analysis?.cropHealth || 0) >= 60 ? 'Good' : 
+                                 (selectedFarm.analysis?.cropHealth || 0) >= 40 ? 'Fair' : 'Needs Attention'}
+                              </div>
+                            </div>
+                            
+                            <div className="bg-blue-50 rounded-lg p-4 text-center">
+                              <div className="text-2xl font-bold text-blue-700 mb-1">
+                                {selectedFarm.analysis?.waterManagement || 0}%
+                              </div>
+                              <Progress 
+                                value={selectedFarm.analysis?.waterManagement || 0} 
+                                className="h-2 mb-4" 
+                              />
+                              
+                              <div className="text-xs text-blue-600 mt-1">
+                                {(selectedFarm.analysis?.waterManagement || 0) >= 80 ? 'Excellent' : 
+                                 (selectedFarm.analysis?.waterManagement || 0) >= 60 ? 'Good' : 
+                                 (selectedFarm.analysis?.waterManagement || 0) >= 40 ? 'Fair' : 'Needs Attention'}
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+                    
                     {/* Analyze Farm Button */}
                     <div className="mt-6">
                   <Button 
@@ -1310,10 +1401,10 @@ const Farm = () => {
                           </CardHeader>
                           <CardContent>
                             <div className="text-3xl font-bold text-purple-700">
-                              {selectedFarm.analysis.overallScore}%
+                              {selectedFarm.analysis?.overallScore || 0}%
                             </div>
                             <Progress 
-                              value={selectedFarm.analysis.overallScore} 
+                              value={selectedFarm.analysis?.overallScore || 0} 
                               className="mt-2" 
                             />
                           </CardContent>
@@ -1325,10 +1416,10 @@ const Farm = () => {
                           </CardHeader>
                           <CardContent>
                             <div className="text-3xl font-bold text-green-700">
-                              {selectedFarm.analysis.sustainabilityScore}%
+                              {selectedFarm.analysis?.sustainabilityScore || 0}%
                     </div>
                           <Progress 
-                            value={selectedFarm.analysis.sustainabilityScore} 
+                            value={selectedFarm.analysis?.sustainabilityScore || 0} 
                             className="mt-2" 
                           />
                         </CardContent>
@@ -1340,10 +1431,10 @@ const Farm = () => {
                           </CardHeader>
                           <CardContent>
                             <div className="text-3xl font-bold text-blue-700">
-                              {selectedFarm.analysis.climateResilience.score}%
+                              {selectedFarm.analysis?.climateResilience?.score || 0}%
                         </div>
                           <Progress 
-                            value={selectedFarm.analysis.climateResilience.score} 
+                            value={selectedFarm.analysis?.climateResilience?.score || 0} 
                             className="mt-2" 
                           />
                         </CardContent>
@@ -1356,43 +1447,55 @@ const Farm = () => {
                         </CardHeader>
                         <CardContent>
                           <p className="text-sm text-gray-700">
-                            {selectedFarm.analysis.detailedAnalysis}
+                            {formatAnalysisText(selectedFarm.analysis?.detailedAnalysis)}
                           </p>
                         </CardContent>
                       </Card>
                       
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <Card>
-                          <CardHeader>
-                            <CardTitle>Key Recommendations</CardTitle>
-                          </CardHeader>
-                          <CardContent>
-                            <ul className="space-y-1 list-disc pl-5">
-                              {selectedFarm.analysis.recommendations.map((rec, index) => (
-                                <li key={index} className="text-sm text-gray-700">{rec}</li>
-                              ))}
-                            </ul>
-                          </CardContent>
-                        </Card>
-                        
-                        <Card>
-                          <CardHeader>
-                            <CardTitle>Recommended Crops</CardTitle>
-                          </CardHeader>
-                          <CardContent>
-                            <div className="flex flex-wrap gap-2">
-                              {selectedFarm.analysis.recommendedCrops?.map((crop, index) => (
-                                <Badge key={index} variant="outline" className="bg-green-50">
-                                  <Sprout className="h-3 w-3 mr-1" />
-                                  {crop}
-                                </Badge>
-                              ))}
-                  </div>
-                          </CardContent>
-                        </Card>
-                      </div>
+                        {/* Recommendations */}
+                        <div>
+                          <h4 className="text-sm font-medium">Key Recommendations</h4>
+                          <ul className="mt-2 space-y-1 list-disc pl-5">
+                            {selectedFarm.analysis?.recommendations?.slice(0, 3).map((rec, index) => (
+                              <li key={index} className="text-sm text-gray-700">{rec}</li>
+                            ))}
+                            {selectedFarm.analysis?.recommendations && selectedFarm.analysis.recommendations.length > 3 && (
+                              <li className="text-sm text-gray-500 italic">
+                                + {selectedFarm.analysis.recommendations.length - 3} more recommendations
+                              </li>
+                            )}
+                          </ul>
                     </div>
-                  </TabsContent>
+                              
+                              {/* Recommended crops */}
+                              <div>
+                                <h4 className="text-sm font-medium">Recommended Crops</h4>
+                                <div className="flex flex-wrap gap-2">
+                                  {selectedFarm.analysis?.recommendedCrops?.map((crop, index) => (
+                                    <Badge key={index} variant="outline" className="bg-green-50">
+                                      <Sprout className="h-3 w-3 mr-1" />
+                                      {crop}
+                                    </Badge>
+                                  ))}
+                  </div>
+              </div>
+                            </div>
+              
+
+                        {/* View detailed analysis button */}
+                        <div className="text-center">
+                  <Button 
+                  variant="outline" 
+                            className="bg-green-50 hover:bg-green-100 text-green-700 border-green-200"
+                            onClick={toggleDetailedAnalysis}
+                >
+                            <Activity className="h-4 w-4 mr-2" />
+                            View Detailed Analysis
+                  </Button>
+              </div>
+                  </div>
+                </TabsContent>
                   
                   {/* Soil Tab */}
                   <TabsContent value="soil" className="pt-4 h-full">
@@ -1405,22 +1508,22 @@ const Farm = () => {
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                           <div className="border rounded-md p-3">
                             <div className="text-sm font-medium text-gray-500">Soil Type</div>
-                            <div className="font-medium">{selectedFarm.analysis.soilAnalysis?.type}</div>
+                            <div className="font-medium">{selectedFarm.analysis?.soilAnalysis?.type}</div>
                     </div>
                     
                           <div className="border rounded-md p-3">
                             <div className="text-sm font-medium text-gray-500">Fertility</div>
-                            <div className="font-medium">{selectedFarm.analysis.soilAnalysis?.fertility}</div>
+                            <div className="font-medium">{selectedFarm.analysis?.soilAnalysis?.fertility}</div>
                         </div>
                         
                           <div className="border rounded-md p-3">
                             <div className="text-sm font-medium text-gray-500">pH Level</div>
-                            <div className="font-medium">{selectedFarm.analysis.soilAnalysis?.phLevel}</div>
+                            <div className="font-medium">{selectedFarm.analysis?.soilAnalysis?.phLevel}</div>
                         </div>
                         
                           <div className="border rounded-md p-3">
                             <div className="text-sm font-medium text-gray-500">Organic Matter</div>
-                            <div className="font-medium">{selectedFarm.analysis.soilAnalysis?.organicMatter}%</div>
+                            <div className="font-medium">{selectedFarm.analysis?.soilAnalysis?.organicMatter}%</div>
                           </div>
                         </div>
                         
@@ -1428,7 +1531,7 @@ const Farm = () => {
                     <div>
                             <h4 className="text-sm font-medium">Problems Identified</h4>
                             <ul className="mt-2 space-y-1 list-disc pl-5">
-                              {selectedFarm.analysis.soilAnalysis?.problems?.map((problem, index) => (
+                              {selectedFarm.analysis?.soilAnalysis?.problems?.map((problem, index) => (
                                 <li key={index} className="text-sm text-gray-700">{problem}</li>
                               ))}
                             </ul>
@@ -1437,7 +1540,7 @@ const Farm = () => {
                     <div>
                             <h4 className="text-sm font-medium">Improvement Suggestions</h4>
                             <ul className="mt-2 space-y-1 list-disc pl-5">
-                              {selectedFarm.analysis.soilAnalysis?.improvementSuggestions?.map((suggestion, index) => (
+                              {selectedFarm.analysis?.soilAnalysis?.improvementSuggestions?.map((suggestion, index) => (
                                 <li key={index} className="text-sm text-gray-700">{suggestion}</li>
                               ))}
                             </ul>
@@ -1459,13 +1562,13 @@ const Farm = () => {
                 <div className="space-y-4">
                           <div className="border rounded-md p-3">
                             <div className="text-sm font-medium text-gray-500">Growth Stage</div>
-                            <div className="font-medium">{selectedFarm.analysis.cropAnalysis?.growthStage}</div>
+                            <div className="font-medium">{selectedFarm.analysis?.cropAnalysis?.growthStage}</div>
                           </div>
                           
                           <div>
                             <h4 className="text-sm font-medium">Health Indicators</h4>
                             <ul className="mt-2 space-y-1 list-disc pl-5">
-                              {selectedFarm.analysis.cropAnalysis?.healthIndicators?.map((indicator, index) => (
+                              {selectedFarm.analysis?.cropAnalysis?.healthIndicators?.map((indicator, index) => (
                                 <li key={index} className="text-sm text-gray-700">{indicator}</li>
                               ))}
                             </ul>
@@ -1474,7 +1577,7 @@ const Farm = () => {
                     <div>
                             <h4 className="text-sm font-medium">Nutrient Deficiencies</h4>
                             <ul className="mt-2 space-y-1 list-disc pl-5">
-                              {selectedFarm.analysis.cropAnalysis?.nutrientDeficiencies?.map((deficiency, index) => (
+                              {selectedFarm.analysis?.cropAnalysis?.nutrientDeficiencies?.map((deficiency, index) => (
                                 <li key={index} className="text-sm text-gray-700">{deficiency}</li>
                               ))}
                             </ul>
@@ -1491,18 +1594,18 @@ const Farm = () => {
                     <div className="space-y-4">
                           <div className="border rounded-md p-3">
                             <div className="text-sm font-medium text-gray-500">Estimated Yield</div>
-                            <div className="font-medium">{selectedFarm.analysis.cropAnalysis?.estimatedYield}</div>
+                            <div className="font-medium">{selectedFarm.analysis?.cropAnalysis?.estimatedYield}</div>
               </div>
               
                           <div className="border rounded-md p-3">
                             <div className="text-sm font-medium text-gray-500">Time to Harvest</div>
-                            <div className="font-medium">{selectedFarm.analysis.cropAnalysis?.harvestTime}</div>
+                            <div className="font-medium">{selectedFarm.analysis?.cropAnalysis?.harvestTime}</div>
               </div>
                         
                           <div>
                             <h4 className="text-sm font-medium">Recommended Crops</h4>
                             <div className="flex flex-wrap gap-2 mt-2">
-                              {selectedFarm.analysis.recommendedCrops?.map((crop, index) => (
+                              {selectedFarm.analysis?.recommendedCrops?.map((crop, index) => (
                                 <Badge key={index} variant="outline" className="bg-green-50">
                                 {crop}
                               </Badge>
@@ -1513,10 +1616,10 @@ const Farm = () => {
                         <div>
                             <h4 className="text-sm font-medium">Climate Resilience</h4>
                             <div className="text-sm text-gray-700">
-                              {selectedFarm.analysis.climateResilience?.score}%
+                              {selectedFarm.analysis?.climateResilience?.score}% 
+                            </div>
+                          </div>
                         </div>
-                      </div>
-                    </div>
                       </CardContent>
                     </Card>
                 </div>
@@ -1542,22 +1645,22 @@ const Farm = () => {
                           <div className="border rounded-md p-3">
                             <div className="text-sm font-medium text-gray-500">Efficiency Rating</div>
                             <div className="font-medium">
-                              {selectedFarm.analysis.waterManagement}% 
+                              {selectedFarm.analysis?.waterManagement}% 
                               <span className="text-xs ml-1 text-blue-600">
-                                ({selectedFarm.analysis.waterManagement > 75 ? 'Good' : 
-                                  selectedFarm.analysis.waterManagement > 50 ? 'Average' : 'Poor'})
+                                {(selectedFarm.analysis?.waterManagement || 0) > 75 ? 'Good' : 
+                                  (selectedFarm.analysis?.waterManagement || 0) > 50 ? 'Average' : 'Poor'}
                               </span>
                             </div>
                           </div>
                           
                           <div className="border rounded-md p-3">
                             <div className="text-sm font-medium text-gray-500">Water Usage</div>
-                            <div className="font-medium">{selectedFarm.analysis.irrigationRecommendations?.waterAmount || '~450 m³/ha'}</div>
+                            <div className="font-medium">{selectedFarm.analysis?.irrigationRecommendations?.waterAmount || '~450 m³/ha'}</div>
                           </div>
                           
                           <div className="border rounded-md p-3">
                             <div className="text-sm font-medium text-gray-500">Schedule Optimization</div>
-                            <div className="font-medium">{selectedFarm.analysis.irrigationRecommendations?.efficiency || '72%'}</div>
+                            <div className="font-medium">{selectedFarm.analysis?.irrigationRecommendations?.efficiency || '72%'}</div>
                     </div>
                         </div>
 
@@ -1569,7 +1672,7 @@ const Farm = () => {
                             <CardContent className="py-4">
                               <div className="flex justify-between items-center mb-2">
                                 <span className="text-sm font-medium">Current Usage</span>
-                                <span>{selectedFarm.analysis.irrigationRecommendations?.waterAmount || '100%'}</span>
+                                <span>{selectedFarm.analysis?.irrigationRecommendations?.waterAmount || '100%'}</span>
                       </div>
                               <Progress 
                                 value={100} 
@@ -1588,7 +1691,7 @@ const Farm = () => {
                               <div className="mt-4 border-t border-gray-100 pt-3">
                                 <h4 className="text-sm font-medium mb-2">Saving Strategies</h4>
                                 <ul className="space-y-1 list-disc pl-5">
-                                  {(selectedFarm.analysis.irrigationRecommendations?.techniques || [
+                                  {(selectedFarm.analysis?.irrigationRecommendations?.techniques || [
                                     "Implement drip irrigation for row crops",
                                     "Schedule irrigation based on soil moisture sensors",
                                     "Apply mulch to reduce evaporation",
@@ -1654,10 +1757,10 @@ const Farm = () => {
                       </CardHeader>
                       <CardContent>
                         <div className="text-3xl font-bold text-green-600">
-                          {selectedFarm.analysis.sustainabilityScore}%
+                          {selectedFarm.analysis?.sustainabilityScore || 0}%
                           </div>
                         <Progress
-                          value={selectedFarm.analysis.sustainabilityScore}
+                          value={selectedFarm.analysis?.sustainabilityScore || 0}
                           className="h-2 mt-2"
                         />
                       </CardContent>
@@ -1672,8 +1775,8 @@ const Farm = () => {
                       <CardContent>
                         <div className="flex justify-between items-center">
                           <div className="text-3xl font-bold text-emerald-600">
-                            {selectedFarm.analysis.carbonFootprint?.rating === 'Low' ? '8.5' : 
-                             selectedFarm.analysis.carbonFootprint?.rating === 'High' ? '18.2' : '12.5'}
+                            {selectedFarm.analysis?.carbonFootprint?.rating === 'Low' ? '8.5' : 
+                             selectedFarm.analysis?.carbonFootprint?.rating === 'High' ? '18.2' : '12.5'}
                             <span className="text-sm font-normal ml-1">tons CO₂e/year</span>
                           </div>
                         </div>
@@ -1681,14 +1784,14 @@ const Farm = () => {
                           <div className="text-center p-1 bg-emerald-50 rounded">
                             <div className="text-xs text-gray-500">Per Hectare</div>
                             <div className="text-sm font-medium">
-                              {selectedFarm.analysis.carbonFootprint?.rating === 'Low' ? '1.5' : 
-                               selectedFarm.analysis.carbonFootprint?.rating === 'High' ? '3.2' : '2.1'} tons
+                              {selectedFarm.analysis?.carbonFootprint?.rating === 'Low' ? '1.5' : 
+                               selectedFarm.analysis?.carbonFootprint?.rating === 'High' ? '3.2' : '2.1'} tons
                       </div>
                     </div>
                           <div className="text-center p-1 bg-emerald-50 rounded">
                             <div className="text-xs text-gray-500">Farm Avg</div>
                             <div className="text-sm font-medium">
-                              {selectedFarm.analysis.carbonFootprint?.rating || 'Medium'}
+                              {selectedFarm.analysis?.carbonFootprint?.rating || 'Medium'}
                 </div>
                           </div>
                           <div className="text-center p-1 bg-emerald-50 rounded">
@@ -1757,10 +1860,10 @@ const Farm = () => {
                         <CardTitle>Sustainability Recommendations</CardTitle>
                       </CardHeader>
                       <CardContent>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                           <div>
-                            <h4 className="text-sm font-medium mb-2">Short-term Actions</h4>
-                            <ul className="space-y-1 list-disc pl-5">
+                            <h4 className="text-sm font-medium mb-3">Short-term Actions</h4>
+                            <ul className="space-y-2 list-disc pl-5">
                               {[
                                 "Implement cover crops during fallow periods",
                                 "Reduce tillage frequency to preserve soil structure",
@@ -1773,8 +1876,8 @@ const Farm = () => {
                         </div>
                         
                         <div>
-                            <h4 className="text-sm font-medium mb-2">Long-term Strategy</h4>
-                            <ul className="space-y-1 list-disc pl-5">
+                            <h4 className="text-sm font-medium mb-3">Long-term Strategy</h4>
+                            <ul className="space-y-2 list-disc pl-5">
                               {[
                                 "Transition to renewable energy sources for farm operations",
                                 "Establish wildlife corridors and habitat areas",
@@ -1801,7 +1904,7 @@ const Farm = () => {
                         </CardHeader>
                         <CardContent className="py-4">
                           <div className="text-3xl font-bold text-green-700 mb-2">
-                            {selectedFarm.analysis.profitabilityAnalysis?.roi || "72%"}
+                            {selectedFarm.analysis?.profitabilityAnalysis?.roi || "72%"}
                 </div>
                           <Progress 
                             value={72} 
@@ -1811,7 +1914,7 @@ const Farm = () => {
                           <div className="grid grid-cols-2 gap-2 mt-4">
                             <div className="border rounded-md p-2">
                               <div className="text-xs text-gray-500">Est. Revenue</div>
-                              <div className="text-sm font-medium">{selectedFarm.analysis.profitabilityAnalysis?.marketValue || "₹380,000/ha"}</div>
+                              <div className="text-sm font-medium">{selectedFarm.analysis?.profitabilityAnalysis?.marketValue || "₹380,000/ha"}</div>
               </div>
               
                             <div className="border rounded-md p-2">
@@ -2021,6 +2124,8 @@ const Farm = () => {
         </Dialog>
       </div>
     </MainLayout>
+      )}
+      </>
   );
 };
 

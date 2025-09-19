@@ -697,143 +697,99 @@ export const analyzeFarmData = async (
     
     console.log('Generating AI analysis for farm:', farmId);
     
-    // Generate comprehensive analysis based on farm properties
-    const soilHealth = Math.floor(Math.random() * 30) + 70; // 70-100
-    const cropHealth = Math.floor(Math.random() * 40) + 60; // 60-100
-    const waterManagement = Math.floor(Math.random() * 35) + 65; // 65-100
-    const pestRisk = Math.floor(Math.random() * 50) + 30; // 30-80
-    const overallScore = Math.round((soilHealth + cropHealth + waterManagement + (100 - pestRisk)) / 4);
+    let aiAnalysisText = '';
     
-    // Generate analysis using the farm's actual properties
-    const analysis = {
-      soilHealth,
-      cropHealth,
-      waterManagement,
-      pestRisk,
-      overallScore,
-      recommendations: [
-        `Implement crop rotation with ${farm.crops[0]} to improve soil health`,
-        `Consider upgrading to ${farm.soilType === 'Clay' ? 'drip' : 'sprinkler'} irrigation to optimize water usage`,
-        'Monitor for early signs of pest infestation',
-        `Apply organic fertilizers to enhance ${farm.soilType} soil fertility`,
-        'Plant cover crops during off-season to prevent soil erosion'
-      ],
-      suitableCrops: [
-        'Wheat', 'Barley', 'Rice', 'Corn', 'Soybeans', 'Potatoes'
-      ],
-      recommendedCrops: [
-        'Rice', 'Corn', 'Cassava'
-      ],
-      irrigationRecommendations: {
-        system: farm.irrigationSystem || 'Drip irrigation',
-        waterRequirement: Math.floor(Math.random() * 500) + 800, // 800-1300 mm per season
-        schedule: `${Math.floor(Math.random() * 3) + 2} times per week`,
-        efficiency: Math.floor(Math.random() * 20) + 75, // 75-95%
-        optimalSystem: farm.farmType === 'Orchard' ? 'Micro-sprinklers' : 'Drip irrigation',
-        wateringFrequency: `${Math.floor(Math.random() * 2) + 3} days`,
-        waterAmount: `${Math.floor(Math.random() * 10) + 15}mm per session`,
-        techniques: [
-          'Drip irrigation',
-          'Rainwater harvesting',
-          'Soil moisture monitoring',
-          'Irrigation scheduling'
-        ]
-      },
-      soilAnalysis: {
-        type: farm.soilType,
-        fertility: farm.soilType === 'Loamy' ? 'High' : farm.soilType === 'Sandy' ? 'Low' : 'Medium',
-        phLevel: Math.floor(Math.random() * 2) + 6, // 6-8
-        organicMatter: Math.floor(Math.random() * 5) + 3, // 3-8%
-        texture: farm.soilType === 'Loamy' ? 'Medium' : farm.soilType === 'Sandy' ? 'Coarse' : 'Fine',
-        problems: [
-          'Low organic matter content',
-          'Slight compaction in tillage zones',
-          'Evidence of erosion on slopes'
-        ],
-        improvementSuggestions: [
-          'Add organic compost to increase organic matter',
-          'Implement minimum tillage practices',
-          'Create contour barriers on slopes to prevent erosion'
-        ]
-      },
-      cropAnalysis: {
-        growthStage: 'Vegetative',
-        healthIndicators: [
-          'Good leaf color',
-          'Proper plant height',
-          'Adequate branching',
-          'Minor pest damage on leaves'
-        ],
-        nutrientDeficiencies: [
-          'Slight nitrogen deficiency',
-          'Potential iron chlorosis in patches'
-        ],
-        estimatedYield: `${Math.floor(Math.random() * 2) + 4} tons/ha`,
-        harvestTime: `${Math.floor(Math.random() * 30) + 60} days until harvest`
-      },
-      sustainabilityScore: Math.floor(Math.random() * 30) + 65, // 65-95
-      carbonFootprint: {
-        rating: 'Moderate',
-        recommendations: [
-          'Implement no-till farming to reduce carbon emissions',
-          'Plant trees around farm perimeter as carbon sinks',
-          'Reduce fossil fuel usage in farm operations',
-          'Incorporate renewable energy sources for pumping and processing'
-        ]
-      },
-      climateResilience: {
-        score: Math.floor(Math.random() * 30) + 60, // 60-90
-        vulnerabilities: [
-          'Susceptible to flooding during heavy rains',
-          'Limited water storage during dry periods',
-          'Potential heat stress for current crop varieties'
-        ],
-        adaptationStrategies: [
-          'Construct drainage channels to manage excess water',
-          'Build rainwater harvesting structures',
-          'Introduce heat-tolerant crop varieties',
-          'Create windbreaks to reduce evaporation'
-        ]
-      },
-      profitabilityAnalysis: {
-        potentialYield: `${Math.floor(Math.random() * 2) + 4}-${Math.floor(Math.random() * 2) + 6} tons/ha`,
-        marketValue: `$${Math.floor(Math.random() * 300) + 800}/ton`,
-        roi: `${Math.floor(Math.random() * 20) + 120}%`,
-        improvements: [
-          'Focus on high-value crop varieties',
-          'Implement precision farming to reduce input costs',
-          'Explore direct marketing to increase profit margins',
-          'Consider value-added processing of farm products'
-        ]
-      },
-      seasonalGuidance: {
-        currentSeason: 'Growing Season',
-        upcomingTasks: [
-          'Top dressing with fertilizer',
-          'Regular monitoring for pests and diseases',
-          'Maintain soil moisture at optimal levels',
-          'Prepare for harvesting equipment maintenance',
-          'Plan for post-harvest storage and processing'
-        ]
-      },
-      detailedAnalysis: `Farm "${farm.name}" in ${farm.location} shows good overall potential with its ${farm.size} hectares of primarily ${farm.farmType.toLowerCase()}. The ${farm.soilType.toLowerCase()} soil is suitable for a variety of crops, particularly ${farm.crops.join(', ')}. Current irrigation system (${farm.irrigationSystem}) is functioning at moderate efficiency but could be optimized further. Soil fertility is adequate but would benefit from organic matter amendments. Water management practices should be adjusted based on seasonal rainfall patterns. Pest pressure is currently low to moderate but requires regular monitoring. Overall sustainability score indicates good practices with room for improvement in resource efficiency and biodiversity support.`
-    };
+    // If we have an image, use Gemini AI for image analysis
+    if (imageUrl) {
+      try {
+        // Import Gemini service dynamically to avoid circular dependencies
+        const { analyzeImage } = await import('../services/geminiService');
+        
+        const analysisPrompt = `
+          Analyze this farm image and provide a realistic agricultural assessment. Consider:
+          
+          Farm Details:
+          - Name: ${farm.name}
+          - Location: ${farm.location}
+          - Size: ${farm.size} hectares
+          - Farm Type: ${farm.farmType}
+          - Soil Type: ${farm.soilType}
+          - Current Crops: ${farm.crops.join(', ')}
+          - Irrigation System: ${farm.irrigationSystem}
+          
+          Please provide a realistic analysis covering:
+          1. Soil condition assessment (visible signs)
+          2. Crop health evaluation (if crops are visible)
+          3. Water management observations
+          4. Pest/disease risk assessment
+          5. Overall farm condition
+          6. Practical recommendations
+          
+          Be realistic and base your analysis only on what you can actually observe in the image.
+          Avoid exaggerated claims or unrealistic projections.
+        `;
+        
+        aiAnalysisText = await analyzeImage(imageUrl, analysisPrompt);
+        console.log('AI image analysis completed');
+      } catch (aiError) {
+        console.error('AI image analysis failed:', aiError);
+        aiAnalysisText = 'AI image analysis unavailable. Using basic farm data analysis.';
+      }
+    }
+    
+    // Generate realistic analysis based on farm properties and AI input
+    const analysis = generateRealisticAnalysis(farm, aiAnalysisText);
+    
+    // Aggressive truncation to prevent document size issues (Firestore has 1MB limit)
+    const maxAnalysisLength = 1000; // Much shorter limit
+    const truncatedAnalysisText = aiAnalysisText.length > maxAnalysisLength 
+      ? aiAnalysisText.substring(0, maxAnalysisLength) + '... (truncated for storage efficiency)'
+      : aiAnalysisText;
+    
+    // Update the detailed analysis with truncated text
+    if (analysis.detailedAnalysis === aiAnalysisText) {
+      analysis.detailedAnalysis = truncatedAnalysisText;
+    }
+    
+    // Don't store base64 image data - only keep image metadata
+    let imageMetadata: string[] = [];
+    if (imageUrl && !imageUrl.startsWith('data:')) {
+      // Only store actual URLs, not base64 data
+      imageMetadata = [...(farm.imageUrls?.filter(url => !url.startsWith('data:')) || []), imageUrl];
+    } else if (imageUrl && imageUrl.startsWith('data:')) {
+      // For base64 images, preserve the original data URL so images can display
+      // Keep only the most recent 3 images to manage storage size
+      const existingDataUrls = farm.imageUrls?.filter(url => url.startsWith('data:')) || [];
+      const recentDataUrls = existingDataUrls.slice(-2); // Keep last 2
+      imageMetadata = [...recentDataUrls, imageUrl]; // Add new one
+    } else {
+      imageMetadata = farm.imageUrls?.filter(url => !url.startsWith('data:')) || [];
+    }
+    
+    // Limit metadata entries
+    const maxMetadata = 2;
+    if (imageMetadata.length > maxMetadata) {
+      imageMetadata = imageMetadata.slice(-maxMetadata);
+    }
     
     // Update farm with analysis
     const updatedFarm = {
       ...farm,
       analysis,
       lastAnalyzed: new Date(),
-      imageUrls: imageUrl ? [...farm.imageUrls, imageUrl] : farm.imageUrls
+      imageUrls: imageMetadata
     };
     
     console.log('Analysis generated successfully, updating farm record');
+    console.log('Analysis size:', JSON.stringify(analysis).length, 'bytes');
+    console.log('Image metadata entries:', imageMetadata.length);
+    console.log('Detailed analysis length:', truncatedAnalysisText.length, 'characters');
     
-    // Save updated farm data
+    // Save updated farm data with aggressive size optimization
     await updateFarmData(farmId, {
       analysis,
       lastAnalyzed: new Date(),
-      imageUrls: updatedFarm.imageUrls
+      imageUrls: imageMetadata
     });
     
     console.log('Farm analysis saved to Firestore');
@@ -843,6 +799,480 @@ export const analyzeFarmData = async (
     throw error;
   }
 };
+
+// Helper function to generate realistic analysis
+function generateRealisticAnalysis(farm: FarmData, aiAnalysisText: string) {
+  // Base scores on farm characteristics rather than random numbers
+  const soilHealthBase = getSoilHealthScore(farm.soilType);
+  const cropHealthBase = getCropHealthScore(farm.farmType, farm.crops);
+  const waterManagementBase = getWaterManagementScore(farm.irrigationSystem);
+  const pestRiskBase = getPestRiskScore(farm.farmType, farm.crops);
+  
+  // Adjust scores slightly based on AI analysis if available
+  const soilHealth = adjustScoreBasedOnAI(soilHealthBase, aiAnalysisText, ['soil', 'fertility', 'erosion']);
+  const cropHealth = adjustScoreBasedOnAI(cropHealthBase, aiAnalysisText, ['crop', 'plant', 'growth', 'leaf']);
+  const waterManagement = adjustScoreBasedOnAI(waterManagementBase, aiAnalysisText, ['water', 'irrigation', 'moisture']);
+  const pestRisk = adjustScoreBasedOnAI(pestRiskBase, aiAnalysisText, ['pest', 'disease', 'damage', 'insect']);
+  
+  const overallScore = Math.round((soilHealth + cropHealth + waterManagement + (100 - pestRisk)) / 4);
+  
+  return {
+    soilHealth,
+    cropHealth,
+    waterManagement,
+    pestRisk,
+    overallScore,
+    recommendations: generateRealisticRecommendations(farm, soilHealth, cropHealth, waterManagement, pestRisk),
+    suitableCrops: getSuitableCropsForRegion(farm.location, farm.soilType),
+    recommendedCrops: getRecommendedCrops(farm.farmType, farm.soilType),
+    irrigationRecommendations: {
+      system: farm.irrigationSystem || 'Drip irrigation',
+      waterRequirement: getRealisticWaterRequirement(farm.farmType, farm.size),
+      schedule: getIrrigationSchedule(farm.farmType, farm.soilType),
+      efficiency: getIrrigationEfficiency(farm.irrigationSystem),
+      optimalSystem: getOptimalIrrigationSystem(farm.farmType, farm.soilType),
+      wateringFrequency: getWateringFrequency(farm.soilType),
+      waterAmount: getWaterAmount(farm.farmType),
+      techniques: getIrrigationTechniques(farm.farmType)
+    },
+    soilAnalysis: {
+      type: farm.soilType,
+      fertility: getSoilFertility(farm.soilType),
+      phLevel: getSoilPH(farm.soilType),
+      organicMatter: getOrganicMatter(farm.soilType),
+      texture: getSoilTexture(farm.soilType),
+      problems: getSoilProblems(farm.soilType),
+      improvementSuggestions: getSoilImprovements(farm.soilType)
+    },
+    cropAnalysis: {
+      growthStage: getCurrentGrowthStage(),
+      healthIndicators: getCropHealthIndicators(cropHealth),
+      nutrientDeficiencies: getNutrientDeficiencies(farm.soilType),
+      estimatedYield: getRealisticYield(farm.farmType, farm.crops[0]),
+      harvestTime: getHarvestTime(farm.farmType, farm.crops[0])
+    },
+    sustainabilityScore: getSustainabilityScore(farm.farmType, farm.irrigationSystem),
+    carbonFootprint: {
+      rating: getCarbonFootprintRating(farm.farmType, farm.size),
+      recommendations: getCarbonRecommendations(farm.farmType)
+    },
+    climateResilience: {
+      score: getClimateResilienceScore(farm.location, farm.farmType),
+      vulnerabilities: getClimateVulnerabilities(farm.location),
+      adaptationStrategies: getAdaptationStrategies(farm.location, farm.farmType)
+    },
+    profitabilityAnalysis: {
+      potentialYield: getRealisticYieldRange(farm.farmType, farm.crops[0]),
+      marketValue: getMarketValue(farm.crops[0]),
+      roi: getRealisticROI(farm.farmType),
+      improvements: getProfitabilityImprovements(farm.farmType)
+    },
+    seasonalGuidance: {
+      currentSeason: getCurrentSeason(),
+      upcomingTasks: getSeasonalTasks(farm.farmType, getCurrentSeason())
+    },
+    detailedAnalysis: aiAnalysisText || generateDetailedAnalysis(farm, overallScore)
+  };
+}
+
+// Helper functions for realistic scoring
+function getSoilHealthScore(soilType: string): number {
+  const scores = {
+    'Loamy': 85,
+    'Clay': 70,
+    'Sandy': 60,
+    'Silt': 75,
+    'Peaty': 80
+  };
+  return scores[soilType as keyof typeof scores] || 70;
+}
+
+function getCropHealthScore(farmType: string, crops: string[]): number {
+  const baseScores = {
+    'Mixed farming': 75,
+    'Organic farming': 80,
+    'Orchard': 85,
+    'Vegetable farming': 70,
+    'Grain farming': 75
+  };
+  return baseScores[farmType as keyof typeof baseScores] || 75;
+}
+
+function getWaterManagementScore(irrigationSystem: string): number {
+  const scores = {
+    'Drip irrigation': 90,
+    'Sprinkler irrigation': 80,
+    'Flood irrigation': 60,
+    'Rain-fed': 50
+  };
+  return scores[irrigationSystem as keyof typeof scores] || 70;
+}
+
+function getPestRiskScore(farmType: string, crops: string[]): number {
+  const riskScores = {
+    'Organic farming': 30,
+    'Mixed farming': 40,
+    'Vegetable farming': 50,
+    'Orchard': 35,
+    'Grain farming': 45
+  };
+  return riskScores[farmType as keyof typeof riskScores] || 40;
+}
+
+function adjustScoreBasedOnAI(baseScore: number, aiText: string, keywords: string[]): number {
+  if (!aiText) return baseScore;
+  
+  const lowerText = aiText.toLowerCase();
+  let adjustment = 0;
+  
+  // Look for positive indicators
+  if (keywords.some(keyword => lowerText.includes(`good ${keyword}`) || lowerText.includes(`healthy ${keyword}`))) {
+    adjustment += 5;
+  }
+  
+  // Look for negative indicators
+  if (keywords.some(keyword => lowerText.includes(`poor ${keyword}`) || lowerText.includes(`damaged ${keyword}`))) {
+    adjustment -= 10;
+  }
+  
+  return Math.max(30, Math.min(100, baseScore + adjustment));
+}
+
+function generateRealisticRecommendations(farm: FarmData, soilHealth: number, cropHealth: number, waterManagement: number, pestRisk: number): string[] {
+  const recommendations = [];
+  
+  if (soilHealth < 70) {
+    recommendations.push(`Improve ${farm.soilType.toLowerCase()} soil health through organic matter addition`);
+  }
+  
+  if (cropHealth < 75) {
+    recommendations.push(`Monitor ${farm.crops[0]} for nutrient deficiencies and adjust fertilization`);
+  }
+  
+  if (waterManagement < 80) {
+    recommendations.push(`Consider upgrading irrigation system for better water efficiency`);
+  }
+  
+  if (pestRisk > 50) {
+    recommendations.push(`Implement integrated pest management for ${farm.farmType.toLowerCase()}`);
+  }
+  
+  recommendations.push(`Regular soil testing for ${farm.soilType.toLowerCase()} soil optimization`);
+  
+  return recommendations;
+}
+
+function getSuitableCropsForRegion(location: string, soilType: string): string[] {
+  // Basic crop suitability based on common agricultural knowledge
+  const cropsByRegion: { [key: string]: string[] } = {
+    'default': ['Wheat', 'Rice', 'Corn', 'Soybeans', 'Potatoes', 'Tomatoes']
+  };
+  
+  return cropsByRegion['default'];
+}
+
+function getRecommendedCrops(farmType: string, soilType: string): string[] {
+  const recommendations: { [key: string]: string[] } = {
+    'Mixed farming': ['Rice', 'Wheat', 'Corn'],
+    'Vegetable farming': ['Tomatoes', 'Potatoes', 'Onions'],
+    'Orchard': ['Apples', 'Oranges', 'Mangoes'],
+    'Grain farming': ['Wheat', 'Barley', 'Corn'],
+    'Organic farming': ['Quinoa', 'Organic vegetables', 'Legumes']
+  };
+  
+  return recommendations[farmType] || ['Rice', 'Wheat', 'Corn'];
+}
+
+// Additional helper functions for realistic data
+function getRealisticWaterRequirement(farmType: string, size: number): number {
+  const baseRequirement = {
+    'Mixed farming': 600,
+    'Vegetable farming': 800,
+    'Orchard': 700,
+    'Grain farming': 500,
+    'Organic farming': 650
+  };
+  
+  return (baseRequirement[farmType as keyof typeof baseRequirement] || 600) * Math.sqrt(size);
+}
+
+function getIrrigationSchedule(farmType: string, soilType: string): string {
+  if (soilType === 'Sandy') return '3-4 times per week';
+  if (soilType === 'Clay') return '1-2 times per week';
+  return '2-3 times per week';
+}
+
+function getIrrigationEfficiency(system: string): number {
+  const efficiency = {
+    'Drip irrigation': 90,
+    'Sprinkler irrigation': 75,
+    'Flood irrigation': 50,
+    'Rain-fed': 40
+  };
+  return efficiency[system as keyof typeof efficiency] || 70;
+}
+
+function getOptimalIrrigationSystem(farmType: string, soilType: string): string {
+  if (farmType === 'Orchard') return 'Micro-sprinklers';
+  if (farmType === 'Vegetable farming') return 'Drip irrigation';
+  if (soilType === 'Sandy') return 'Drip irrigation';
+  return 'Sprinkler irrigation';
+}
+
+function getWateringFrequency(soilType: string): string {
+  const frequency = {
+    'Sandy': '2-3 days',
+    'Clay': '5-7 days',
+    'Loamy': '3-4 days',
+    'Silt': '4-5 days'
+  };
+  return frequency[soilType as keyof typeof frequency] || '3-4 days';
+}
+
+function getWaterAmount(farmType: string): string {
+  const amounts = {
+    'Vegetable farming': '20-25mm per session',
+    'Orchard': '25-30mm per session',
+    'Grain farming': '15-20mm per session',
+    'Mixed farming': '18-22mm per session'
+  };
+  return amounts[farmType as keyof typeof amounts] || '20mm per session';
+}
+
+function getIrrigationTechniques(farmType: string): string[] {
+  return [
+    'Drip irrigation',
+    'Soil moisture monitoring',
+    'Irrigation scheduling',
+    'Rainwater harvesting'
+  ];
+}
+
+function getSoilFertility(soilType: string): string {
+  const fertility = {
+    'Loamy': 'High',
+    'Clay': 'Medium',
+    'Sandy': 'Low',
+    'Silt': 'Medium',
+    'Peaty': 'High'
+  };
+  return fertility[soilType as keyof typeof fertility] || 'Medium';
+}
+
+function getSoilPH(soilType: string): number {
+  const ph = {
+    'Loamy': 6.8,
+    'Clay': 7.2,
+    'Sandy': 6.2,
+    'Silt': 6.5,
+    'Peaty': 5.8
+  };
+  return ph[soilType as keyof typeof ph] || 6.5;
+}
+
+function getOrganicMatter(soilType: string): number {
+  const om = {
+    'Loamy': 4.5,
+    'Clay': 3.2,
+    'Sandy': 1.8,
+    'Silt': 3.8,
+    'Peaty': 8.5
+  };
+  return om[soilType as keyof typeof om] || 3.5;
+}
+
+function getSoilTexture(soilType: string): string {
+  const texture = {
+    'Loamy': 'Medium',
+    'Clay': 'Fine',
+    'Sandy': 'Coarse',
+    'Silt': 'Fine',
+    'Peaty': 'Organic'
+  };
+  return texture[soilType as keyof typeof texture] || 'Medium';
+}
+
+function getSoilProblems(soilType: string): string[] {
+  const problems: { [key: string]: string[] } = {
+    'Sandy': ['Poor water retention', 'Nutrient leaching'],
+    'Clay': ['Poor drainage', 'Compaction issues'],
+    'Loamy': ['Minor nutrient depletion'],
+    'Silt': ['Erosion susceptibility'],
+    'Peaty': ['Drainage management needed']
+  };
+  return problems[soilType] || ['Regular monitoring needed'];
+}
+
+function getSoilImprovements(soilType: string): string[] {
+  const improvements: { [key: string]: string[] } = {
+    'Sandy': ['Add organic matter', 'Use cover crops'],
+    'Clay': ['Improve drainage', 'Add organic amendments'],
+    'Loamy': ['Maintain organic matter levels'],
+    'Silt': ['Prevent erosion', 'Add organic matter'],
+    'Peaty': ['Manage water levels', 'Prevent subsidence']
+  };
+  return improvements[soilType] || ['Regular soil testing', 'Organic matter addition'];
+}
+
+function getCurrentGrowthStage(): string {
+  const month = new Date().getMonth();
+  if (month >= 2 && month <= 5) return 'Vegetative';
+  if (month >= 6 && month <= 8) return 'Flowering';
+  if (month >= 9 && month <= 11) return 'Maturation';
+  return 'Dormant/Preparation';
+}
+
+function getCropHealthIndicators(healthScore: number): string[] {
+  if (healthScore >= 80) {
+    return ['Good leaf color', 'Proper plant height', 'Adequate branching', 'No visible stress'];
+  } else if (healthScore >= 60) {
+    return ['Moderate leaf color', 'Average plant height', 'Some stress indicators'];
+  } else {
+    return ['Poor leaf color', 'Stunted growth', 'Visible stress signs'];
+  }
+}
+
+function getNutrientDeficiencies(soilType: string): string[] {
+  const deficiencies: { [key: string]: string[] } = {
+    'Sandy': ['Nitrogen deficiency', 'Potassium leaching'],
+    'Clay': ['Iron chlorosis', 'Phosphorus fixation'],
+    'Loamy': ['Minor nutrient imbalances'],
+    'Silt': ['Potential nitrogen loss'],
+    'Peaty': ['Micronutrient deficiencies']
+  };
+  return deficiencies[soilType] || ['Regular nutrient monitoring needed'];
+}
+
+function getRealisticYield(farmType: string, crop: string): string {
+  const yields: { [key: string]: string } = {
+    'Rice': '4-6 tons/ha',
+    'Wheat': '3-5 tons/ha',
+    'Corn': '5-8 tons/ha',
+    'Tomatoes': '25-40 tons/ha',
+    'Potatoes': '20-35 tons/ha'
+  };
+  return yields[crop] || '3-5 tons/ha';
+}
+
+function getHarvestTime(farmType: string, crop: string): string {
+  const times: { [key: string]: string } = {
+    'Rice': '90-120 days until harvest',
+    'Wheat': '100-130 days until harvest',
+    'Corn': '80-100 days until harvest',
+    'Tomatoes': '60-80 days until harvest',
+    'Potatoes': '70-90 days until harvest'
+  };
+  return times[crop] || '90 days until harvest';
+}
+
+function getSustainabilityScore(farmType: string, irrigationSystem: string): number {
+  let score = 70;
+  if (farmType === 'Organic farming') score += 15;
+  if (irrigationSystem === 'Drip irrigation') score += 10;
+  return Math.min(95, score);
+}
+
+function getCarbonFootprintRating(farmType: string, size: number): string {
+  if (farmType === 'Organic farming') return 'Low';
+  if (size < 5) return 'Low';
+  if (size < 20) return 'Moderate';
+  return 'High';
+}
+
+function getCarbonRecommendations(farmType: string): string[] {
+  return [
+    'Implement no-till farming practices',
+    'Use organic fertilizers',
+    'Plant cover crops',
+    'Optimize machinery usage'
+  ];
+}
+
+function getClimateResilienceScore(location: string, farmType: string): number {
+  let score = 70;
+  if (farmType === 'Mixed farming') score += 10;
+  if (farmType === 'Organic farming') score += 5;
+  return score;
+}
+
+function getClimateVulnerabilities(location: string): string[] {
+  return [
+    'Seasonal rainfall variability',
+    'Temperature fluctuations',
+    'Potential drought periods'
+  ];
+}
+
+function getAdaptationStrategies(location: string, farmType: string): string[] {
+  return [
+    'Diversify crop varieties',
+    'Improve water storage capacity',
+    'Implement climate-smart practices',
+    'Use weather monitoring systems'
+  ];
+}
+
+function getRealisticYieldRange(farmType: string, crop: string): string {
+  const ranges: { [key: string]: string } = {
+    'Rice': '4-6 tons/ha',
+    'Wheat': '3-5 tons/ha',
+    'Corn': '5-8 tons/ha',
+    'Tomatoes': '25-40 tons/ha'
+  };
+  return ranges[crop] || '3-6 tons/ha';
+}
+
+function getMarketValue(crop: string): string {
+  const values: { [key: string]: string } = {
+    'Rice': '$400-600/ton',
+    'Wheat': '$300-450/ton',
+    'Corn': '$250-400/ton',
+    'Tomatoes': '$800-1200/ton'
+  };
+  return values[crop] || '$400-600/ton';
+}
+
+function getRealisticROI(farmType: string): string {
+  const roi = {
+    'Vegetable farming': '110-130%',
+    'Orchard': '120-150%',
+    'Grain farming': '105-120%',
+    'Mixed farming': '110-125%',
+    'Organic farming': '115-135%'
+  };
+  return roi[farmType as keyof typeof roi] || '110-125%';
+}
+
+function getProfitabilityImprovements(farmType: string): string[] {
+  return [
+    'Optimize input costs',
+    'Improve crop quality',
+    'Explore direct marketing',
+    'Implement precision farming'
+  ];
+}
+
+function getCurrentSeason(): string {
+  const month = new Date().getMonth();
+  if (month >= 2 && month <= 5) return 'Spring/Summer';
+  if (month >= 6 && month <= 8) return 'Monsoon';
+  if (month >= 9 && month <= 11) return 'Post-Monsoon';
+  return 'Winter';
+}
+
+function getSeasonalTasks(farmType: string, season: string): string[] {
+  const tasks: { [key: string]: string[] } = {
+    'Spring/Summer': ['Prepare fields', 'Plant crops', 'Monitor growth'],
+    'Monsoon': ['Manage water drainage', 'Monitor for diseases', 'Weed control'],
+    'Post-Monsoon': ['Harvest preparation', 'Pest monitoring', 'Fertilizer application'],
+    'Winter': ['Harvest activities', 'Field preparation', 'Equipment maintenance']
+  };
+  return tasks[season] || ['Regular monitoring', 'Maintenance activities'];
+}
+
+function generateDetailedAnalysis(farm: FarmData, overallScore: number): string {
+  return `Farm "${farm.name}" in ${farm.location} shows ${overallScore >= 80 ? 'excellent' : overallScore >= 60 ? 'good' : 'moderate'} potential with its ${farm.size} hectares of ${farm.farmType.toLowerCase()}. The ${farm.soilType.toLowerCase()} soil provides a ${getSoilFertility(farm.soilType).toLowerCase()} fertility base for growing ${farm.crops.join(', ')}. Current irrigation system (${farm.irrigationSystem}) operates at ${getIrrigationEfficiency(farm.irrigationSystem)}% efficiency. Regular monitoring and sustainable practices will help maintain and improve farm productivity.`;
+}
 
 // Function to delete a farm
 export const deleteFarm = async (farmId: string): Promise<void> => {
