@@ -167,10 +167,28 @@ const SoilLab = () => {
           });
         } catch (error: any) {
           console.error('Error analyzing soil:', error);
+          
+          // Handle specific error types
+          let errorTitle = 'Analysis Failed';
+          let errorDescription = error.message || 'Unable to analyze the soil image. Please try again.';
+          let errorVariant: "default" | "destructive" = "destructive";
+          
+          if (error.message && error.message.includes('429')) {
+            errorTitle = 'API Quota Exceeded';
+            errorDescription = 'Daily API limit reached. Please try again in a few hours or upgrade your plan for unlimited analysis.';
+            errorVariant = "default";
+          } else if (error.message && error.message.includes('timeout')) {
+            errorTitle = 'Analysis Timeout';
+            errorDescription = 'Analysis took too long. Please try again with a smaller or clearer image.';
+          } else if (error.message && error.message.includes('safety')) {
+            errorTitle = 'Content Issue';
+            errorDescription = 'Image content was flagged. Please ensure the image shows only soil and try again.';
+          }
+          
           toast({
-            title: 'Analysis Failed',
-            description: error.message || 'Unable to analyze the soil image. Please try again.',
-            variant: "destructive"
+            title: errorTitle,
+            description: errorDescription,
+            variant: errorVariant
           });
         } finally {
           setIsAnalyzing(false);

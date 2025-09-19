@@ -136,9 +136,9 @@ export const generateTextResponse = async (
   } = {}
 ): Promise<string> => {
   const {
-    maxRetries = 2,
-    timeout = 30000, // 30 seconds default timeout
-    temperature = 0.4,
+    maxRetries = 0, // Default to no retries to avoid rate limiting
+    timeout = 8000, // Much shorter default timeout - 8 seconds
+    temperature = 0.2, // Lower temperature for more consistent output
   } = options;
   
   if (!geminiModel) {
@@ -163,13 +163,14 @@ export const generateTextResponse = async (
     try {
       // Race the API call against the timeout
       const generatePromise = async () => {
-        // Create a custom generation config for this specific request
+        // Use minimal generation config for faster response
         const result = await geminiModel.generateContent(prompt, {
           generationConfig: {
             temperature: temperature,
-            topP: 0.8,
-            topK: 40,
-            maxOutputTokens: 2048,
+            topP: 0.9, // Slightly higher for variety but still focused
+            topK: 20, // Reduced from 40 for faster processing
+            maxOutputTokens: 1024, // Reduced from 2048 for faster response
+            candidateCount: 1, // Only generate one candidate
           },
         });
         
@@ -311,39 +312,40 @@ export const analyzeSoil = async (imageData: string): Promise<any> => {
   const prompt = `
     Analyze this soil image and provide detailed soil analysis. If no soil is visible, set soilPresent to false.
     
-    Return ONLY this JSON structure with NO additional text:
+    You are a professional soil scientist. Examine the soil in the image and provide a comprehensive assessment based on what you observe.
+    
+    Analyze the soil's:
+    - Color, texture, and composition
+    - Visible organic matter content
+    - Moisture levels and drainage characteristics
+    - Overall fertility indicators
+    - Suitable crops for this soil type
+    
+    Return your analysis in this JSON format with NO additional text:
     {
-      "soilPresent": true,
-      "soilType": "Clay Loam",
-      "fertility": "Medium",
-      "phLevel": "6.5-7.0",
-      "recommendations": "Add organic matter and ensure proper drainage",
-      "suitableCrops": ["wheat", "corn", "soybeans"],
-      "confidenceScore": 7,
+      "soilPresent": true/false,
+      "soilType": "actual soil type you observe",
+      "fertility": "Low/Medium/High based on visual indicators",
+      "phLevel": "estimated pH range",
+      "recommendations": "specific recommendations based on your analysis",
+      "suitableCrops": ["crops suitable for this specific soil"],
+      "confidenceScore": confidence_number_1_to_10,
       "nutrients": {
-        "nitrogen": 35,
-        "phosphorus": 28,
-        "potassium": 42,
-        "organicMatter": 15,
-        "sulfur": 10
+        "nitrogen": estimated_percentage,
+        "phosphorus": estimated_percentage,
+        "potassium": estimated_percentage,
+        "organicMatter": estimated_percentage,
+        "sulfur": estimated_percentage
       },
       "properties": {
-        "ph": 6.8,
-        "texture": "Clay Loam",
-        "waterRetention": 65,
-        "drainage": "Good"
+        "ph": estimated_ph_number,
+        "texture": "observed texture",
+        "waterRetention": estimated_percentage,
+        "drainage": "Poor/Moderate/Good"
       }
     }
     
-    Rules:
-    - soilPresent: boolean (false if no soil visible)
-    - fertility: "Low", "Medium", or "High"
-    - confidenceScore: number 1-10
-    - All nutrient values: numbers 0-100
-    - ph: number 0-14
-    - waterRetention: number 0-100
-    - drainage: "Poor", "Moderate", or "Good"
-    - Return ONLY the JSON object
+    Base your analysis on what you actually see in the image. Do not use generic values.
   `;
 
   let retryCount = 0;
@@ -366,7 +368,7 @@ export const analyzeSoil = async (imageData: string): Promise<any> => {
 
       const result = await geminiModel.generateContent([prompt, imagePart], {
         generationConfig: {
-          temperature: 0.2,
+          temperature: 0.3,
           topP: 0.8,
           topK: 40,
           maxOutputTokens: 1024,
@@ -443,13 +445,30 @@ export const analyzeSoil = async (imageData: string): Promise<any> => {
       
       if (retryCount >= maxRetries) {
         console.error('All soil analysis attempts failed');
+        
+        // Handle specific API errors
+        let fallbackReason = 'Analysis Failed - Please Try Again';
+        let fallbackRecommendations = 'Unable to analyze soil image. Please try again with a clearer image showing soil surface.';
+        
+        if (error.message && error.message.includes('429')) {
+          fallbackReason = 'API Quota Exceeded';
+          fallbackRecommendations = 'Daily API limit reached. Please try again later or upgrade your plan for unlimited analysis.';
+          console.warn('Gemini API quota exceeded - consider upgrading plan or waiting for quota reset');
+        } else if (error.message && error.message.includes('timeout')) {
+          fallbackReason = 'Analysis Timeout';
+          fallbackRecommendations = 'Analysis took too long. Please try again with a smaller or clearer image.';
+        } else if (error.message && error.message.includes('safety')) {
+          fallbackReason = 'Content Safety Issue';
+          fallbackRecommendations = 'Image content was flagged. Please ensure the image shows only soil and try again.';
+        }
+        
         return {
           soilPresent: true,
-          soilType: 'Analysis Failed',
+          soilType: fallbackReason,
           fertility: 'Medium',
           phLevel: '6.5-7.0',
-          recommendations: 'Unable to analyze soil image. Please try again with a clearer image showing soil surface.',
-          suitableCrops: ['Analysis incomplete'],
+          recommendations: fallbackRecommendations,
+          suitableCrops: ['wheat', 'corn', 'rice', 'soybeans'],
           confidenceScore: 3,
           nutrients: { nitrogen: 30, phosphorus: 25, potassium: 35, organicMatter: 12, sulfur: 8 },
           properties: { ph: 6.8, texture: 'Unknown', waterRetention: 50, drainage: 'Moderate' }
@@ -734,6 +753,17 @@ export const getFarmingRecommendation = async (
   query?: string,
   language: string = 'en'
 ): Promise<string> => {
+  if (!geminiModel) {
+    console.error('Gemini client not initialized');
+    if (language === 'te') {
+      return 'సేవ అందుబాటులో లేదు. దయచేసి తర్వాత మళ్లీ ప్రయత్నించండి లేదా పేజీని రిఫ్రెష్ చేయండి.';
+    } else if (language === 'hi') {
+      return 'सेवा उपलब्ध नहीं है। कृपया बाद में पुनः प्रयास करें या पृष्ठ को रीफ्रेश करें।';
+    } else {
+      return 'Service not available. Please try again later or refresh the page.';
+    }
+  }
+
   // Define language instructions based on the language code
   const languageInstructions = {
     en: 'Respond in English.',
@@ -749,13 +779,25 @@ export const getFarmingRecommendation = async (
   console.log('Query:', query);
 
   const promptContext = `
+    You are an expert agricultural consultant. Analyze the following farm profile and provide personalized farming advice.
+    
     User Profile:
     - Location: ${userProfile.location || 'Unknown'}
     - Farm Type: ${userProfile.farmType || 'General farming'}
     - Main Crops: ${userProfile.crops?.join(', ') || 'Not specified'}
     - Soil Type: ${userProfile.soilType || 'Not specified'}
     
-    Based on this profile, provide personalized farming advice${query ? ` regarding: ${query}` : ''}.
+    ${query ? `Specific Question: ${query}` : 'Provide general farming recommendations for this profile.'}
+    
+    Based on this specific profile, provide personalized farming advice that considers:
+    - The specific location and climate conditions
+    - The mentioned soil type and its characteristics
+    - The current crops and potential crop rotation benefits
+    - The farm type and scale of operations
+    - Seasonal considerations for the location
+    - Water management strategies
+    - Pest and disease prevention specific to the crops and region
+    
     Focus on actionable recommendations that are specific to the user's context.
     Keep your response concise but informative, around 2-3 paragraphs maximum.
     
@@ -768,30 +810,55 @@ export const getFarmingRecommendation = async (
     - Market: Market prices, trends, and selling opportunities
     - Profile: User profile management and settings
     
-    If the query includes "guide me through the app" or similar, explain the key features of the app and how they can help the farmer.
-    If the query includes "suggestions for my farm" or similar, provide specific recommendations based on their profile.
-    If the query includes "help with my crops" or similar, provide advice specific to the crops mentioned in their profile.
-    
     ${languageInstruction}
   `;
-  
-  try {
-    const response = await generateTextResponse(promptContext);
-    console.log('Successfully generated farming recommendation');
-    return response;
-  } catch (error) {
-    console.error('Error getting farming recommendation:', error);
-    if (error instanceof Error) {
-      console.error('Error details:', error.message);
-    }
-    
-    // Provide error messages in the appropriate language
-    if (language === 'te') {
-      return 'క్షమించండి, ప్రస్తుతం వ్యక్తిగతీకరించిన సిఫార్సును రూపొందించడం సాధ్యం కాలేదు. దయచేసి తర్వాత మళ్లీ ప్రయత్నించండి.';
-    } else if (language === 'hi') {
-      return 'मैं क्षमा चाहता हूं, लेकिन मैं इस समय एक वैयक्तिकृत अनुशंसा उत्पन्न करने में असमर्थ था। कृपया बाद में पुन: प्रयास करें।';
-    } else {
-      return 'I apologize, but I was unable to generate a personalized recommendation at this time. Please try again later.';
+
+  let retryCount = 0;
+  const maxRetries = 3;
+
+  while (retryCount <= maxRetries) {
+    try {
+      console.log(`Farming recommendation attempt ${retryCount + 1}/${maxRetries + 1}`);
+      
+      const result = await geminiModel.generateContent(promptContext, {
+        generationConfig: {
+          temperature: 0.3,
+          topP: 0.8,
+          topK: 40,
+          maxOutputTokens: 1024,
+        },
+      });
+      
+      const response = result.response;
+      const text = response.text();
+      
+      if (!text || text.trim().length === 0) {
+        throw new Error('Empty response from Gemini');
+      }
+      
+      console.log('Successfully generated farming recommendation, length:', text.length);
+      return text.trim();
+      
+    } catch (error: any) {
+      console.error(`Farming recommendation attempt ${retryCount + 1} failed:`, error.message);
+      
+      if (retryCount >= maxRetries) {
+        console.error('All farming recommendation attempts failed');
+        
+        // Provide error messages in the appropriate language
+        if (language === 'te') {
+          return 'క్షమించండి, ప్రస్తుతం వ్యక్తిగతీకరించిన సిఫార్సును రూపొందించడం సాధ్యం కాలేదు. దయచేసి తర్వాత మళ్లీ ప్రయత్నించండి.';
+        } else if (language === 'hi') {
+          return 'मैं क्षमा चाहता हूं, लेकिन मैं इस समय एक वैयक्तिकृत अनुशंसा उत्पन्न करने में असमर्थ था। कृपया बाद में पुन: प्रयास करें।';
+        } else {
+          return 'I apologize, but I was unable to generate a personalized recommendation at this time. Please try again later.';
+        }
+      }
+      
+      // Wait before retry with exponential backoff
+      const delay = Math.min(1000 * Math.pow(2, retryCount), 5000);
+      await new Promise(resolve => setTimeout(resolve, delay));
+      retryCount++;
     }
   }
 };

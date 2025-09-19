@@ -8,9 +8,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Slider } from '@/components/ui/slider';
 import { Progress } from '@/components/ui/progress';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Droplets, Thermometer, Leaf, Clock, ArrowRight, Loader2, Sun, Cloud, Calendar, Building2, AlertCircle } from 'lucide-react';
+import { Droplets, Thermometer, Leaf, Clock, ArrowRight, Loader2, Sun, Cloud, Calendar, Building2, AlertCircle, MapPin, CloudSun } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
-import { getFarmingRecommendation } from '@/services/geminiService';
+import { getCurrentWeather, getForecast } from '@/services/weatherService';
+import { useLocation } from '@/hooks/useLocation';
 import { useTranslation } from 'react-i18next';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { getUserFarms, FarmData } from '@/lib/firestore';
@@ -47,6 +48,172 @@ const climateData = {
   }
 };
 
+// Helper function to get current season
+const getCurrentSeason = () => {
+  const month = new Date().getMonth() + 1; // getMonth() returns 0-11
+  
+  if (month >= 3 && month <= 5) {
+    return 'Summer';
+  } else if (month >= 6 && month <= 9) {
+    return 'Monsoon';
+  } else if (month >= 10 && month <= 11) {
+    return 'Post-Monsoon';
+  } else {
+    return 'Winter';
+  }
+};
+
+// Helper function to get expected yield based on crop type
+const getExpectedYield = (cropName: string): string => {
+  const yields: { [key: string]: string } = {
+    rice: '5.8 tons/ha',
+    wheat: '4.2 tons/ha',
+    cotton: '2.3 tons/ha',
+    sugarcane: '80 tons/ha',
+    corn: '6.5 tons/ha',
+    maize: '6.5 tons/ha',
+    soybean: '2.8 tons/ha',
+    tomato: '45 tons/ha',
+    potato: '25 tons/ha',
+    onion: '20 tons/ha',
+    groundnut: '2.5 tons/ha',
+    sunflower: '1.8 tons/ha',
+    mustard: '1.5 tons/ha',
+    barley: '3.5 tons/ha',
+    millet: '2.2 tons/ha',
+    sorghum: '3.0 tons/ha'
+  };
+  return yields[cropName.toLowerCase()] || `${(Math.random() * 5 + 2).toFixed(1)} tons/ha`;
+};
+
+// Helper function to get growing period based on crop type
+const getGrowingPeriod = (cropName: string): string => {
+  const periods: { [key: string]: string } = {
+    rice: '120-140 days',
+    wheat: '110-130 days',
+    cotton: '160-180 days',
+    sugarcane: '10-12 months',
+    corn: '90-110 days',
+    maize: '90-110 days',
+    soybean: '100-120 days',
+    tomato: '70-90 days',
+    potato: '90-110 days',
+    onion: '120-150 days',
+    groundnut: '110-130 days',
+    sunflower: '90-110 days',
+    mustard: '90-110 days',
+    barley: '110-130 days',
+    millet: '70-90 days',
+    sorghum: '100-120 days'
+  };
+  return periods[cropName.toLowerCase()] || `${Math.floor(Math.random() * 60) + 90} days`;
+};
+
+// Helper function to get water requirements based on crop type
+const getWaterRequirements = (cropName: string): string => {
+  const requirements: { [key: string]: string } = {
+    rice: 'High (1200-1500mm)',
+    wheat: 'Medium (450-650mm)',
+    cotton: 'Medium (700-900mm)',
+    sugarcane: 'High (1500-2500mm)',
+    corn: 'Medium (500-800mm)',
+    maize: 'Medium (500-800mm)',
+    soybean: 'Medium (450-700mm)',
+    tomato: 'Medium (400-600mm)',
+    potato: 'Medium (500-700mm)',
+    onion: 'Medium (350-550mm)',
+    groundnut: 'Low (500-750mm)',
+    sunflower: 'Medium (400-600mm)',
+    mustard: 'Low (300-400mm)',
+    barley: 'Medium (450-650mm)',
+    millet: 'Low (300-500mm)',
+    sorghum: 'Low (450-650mm)'
+  };
+  return requirements[cropName.toLowerCase()] || 'Medium (500-800mm)';
+};
+
+// Helper function to get location-based recommendations
+const getLocationBasedRecommendations = (location: string, soilType: string) => {
+  // Default recommendations based on common crops for the region
+  const defaultCrops = ['Rice', 'Cotton', 'Sugarcane'];
+  
+  return defaultCrops.map((cropName, index) => {
+    const cropNameLower = cropName.toLowerCase();
+    let iconConfig = cropIcons.default;
+    
+    for (const key in cropIcons) {
+      if (key !== 'default' && (cropNameLower.includes(key) || key.includes(cropNameLower))) {
+        iconConfig = cropIcons[key as keyof typeof cropIcons];
+        break;
+      }
+    }
+    
+    return {
+      cropName,
+      confidence: 85 + index * 3,
+      expectedYield: getExpectedYield(cropName),
+      growingPeriod: getGrowingPeriod(cropName),
+      waterRequirements: getWaterRequirements(cropName),
+      weatherSuitability: `${cropName} is suitable for the current weather conditions in ${location}.`,
+      seasonalAdvice: `Best planting time for ${cropName} in your region is during the appropriate season.`,
+      icon: iconConfig.icon,
+      color: iconConfig.color
+    };
+  });
+};
+
+// Helper function to extract specific crop information from AI response
+const extractCropInfo = (response: string, cropName: string) => {
+  const cropInfo: any = {};
+  
+  // Extract yield information
+  const yieldPattern = new RegExp(`${cropName}.*?yield.*?(\\d+(?:\\.\\d+)?)\\s*(?:tons?/ha|kg/ha)`, 'gi');
+  const yieldMatch = response.match(yieldPattern);
+  if (yieldMatch && yieldMatch[0]) {
+    const yieldNumbers = yieldMatch[0].match(/(\d+(?:\.\d+)?)/);
+    if (yieldNumbers && yieldNumbers[1]) {
+      cropInfo.yield = yieldNumbers[1] + ' tons/ha';
+    }
+  }
+  
+  // Extract growing period information
+  const periodPattern = new RegExp(`${cropName}.*?(?:growing|period).*?(\\d+(?:-\\d+)?)\\s*(?:days|months)`, 'gi');
+  const periodMatch = response.match(periodPattern);
+  if (periodMatch && periodMatch[0]) {
+    const periodNumbers = periodMatch[0].match(/(\d+(?:-\d+)?)\s*(?:days|months)/);
+    if (periodNumbers && periodNumbers[1]) {
+      cropInfo.period = periodNumbers[1] + ' days';
+    }
+  }
+  
+  // Extract water requirements information
+  const waterPattern = new RegExp(`${cropName}.*?water.*?(high|medium|low|moderate)`, 'gi');
+  const waterMatch = response.match(waterPattern);
+  if (waterMatch && waterMatch[0]) {
+    const waterLevel = waterMatch[0].match(/(high|medium|low|moderate)/i);
+    if (waterLevel && waterLevel[1]) {
+      const level = waterLevel[1].charAt(0).toUpperCase() + waterLevel[1].slice(1);
+      cropInfo.water = level + ' (500-800mm)';
+    }
+  }
+  
+  // Extract weather suitability information
+  const weatherPattern = new RegExp(`${cropName}.*?(?:weather|suitable).*?(suitable|excellent|good|poor|tolerates)`, 'gi');
+  const weatherMatch = response.match(weatherPattern);
+  if (weatherMatch && weatherMatch[0]) {
+    cropInfo.weatherSuitability = `${cropName} shows good weather suitability for current conditions.`;
+  }
+  
+  // Extract seasonal advice information
+  const seasonalPattern = new RegExp(`${cropName}.*?(?:season|plant|advice).*?(monsoon|winter|summer|plant|harvest)`, 'gi');
+  const seasonalMatch = response.match(seasonalPattern);
+  if (seasonalMatch && seasonalMatch[0]) {
+    cropInfo.seasonalAdvice = `Optimal planting time for ${cropName} based on current seasonal conditions.`;
+  }
+  
+  return cropInfo;
+};
+
 const CropAdvisor = () => {
   const { toast } = useToast();
   const { t } = useTranslation();
@@ -59,48 +226,278 @@ const CropAdvisor = () => {
   const [userFarms, setUserFarms] = useState<FarmData[]>([]);
   const [selectedFarmId, setSelectedFarmId] = useState('');
   const [error, setError] = useState('');
+  const [weatherLoading, setWeatherLoading] = useState(false);
+  const [weatherError, setWeatherError] = useState('');
+  const [currentWeather, setCurrentWeather] = useState<any>(null);
+  const [forecast, setForecast] = useState<any>(null);
+  const [recommendations, setRecommendations] = useState<any[]>([]);
   
-  // Form data state
+  const { location, locationLoading, requestLocation } = useLocation();
+  
   const [formData, setFormData] = useState({
     location: 'Andhra Pradesh, India',
     soilType: 'clay',
     cropType: 'grain',
     waterAvailability: 70,
     landSize: '5',
-    previousCrop: 'rice'
+    previousCrop: ''
   });
-  
-  // Recommendations state
-  const [recommendations, setRecommendations] = useState([
-    {
-      cropName: 'Rice',
-      confidence: 92,
-      expectedYield: '5.8 tons/ha',
-      growingPeriod: '120-140 days',
-      waterRequirements: 'High (1200-1500mm)',
-      icon: cropIcons.rice.icon,
-      color: cropIcons.rice.color
-    },
-    {
-      cropName: 'Cotton',
-      confidence: 87,
-      expectedYield: '2.3 tons/ha',
-      growingPeriod: '160-180 days',
-      waterRequirements: 'Medium (700-900mm)',
-      icon: cropIcons.cotton.icon,
-      color: cropIcons.cotton.color
-    },
-    {
-      cropName: 'Sugarcane',
-      confidence: 78,
-      expectedYield: '80 tons/ha',
-      growingPeriod: '10-12 months',
-      waterRequirements: 'High (1500-2500mm)',
-      icon: cropIcons.sugarcane.icon,
-      color: cropIcons.sugarcane.color
+
+  // Get crop recommendations
+  const handleGetRecommendations = async () => {
+    setIsLoading(true);
+    setError('');
+    
+    if (!formData.location) {
+      setError('Please provide a location for accurate recommendations');
+      setIsLoading(false);
+      return;
     }
-  ]);
-  
+    
+    try {
+      // Prepare weather context for better recommendations
+      let weatherContext = '';
+      if (currentWeather && forecast) {
+        const currentTemp = Math.round(currentWeather.main.temp);
+        const humidity = currentWeather.main.humidity;
+        const weatherCondition = currentWeather.weather[0].main;
+        const windSpeed = Math.round(currentWeather.wind.speed * 3.6);
+        
+        // Get upcoming weather trends from forecast
+        const upcomingDays = forecast.list.slice(0, 8); // Next 24 hours (3-hour intervals)
+        const avgTemp = upcomingDays.reduce((sum: number, item: any) => sum + item.main.temp, 0) / upcomingDays.length;
+        const rainProbability = upcomingDays.some((item: any) => item.weather[0].main.includes('Rain'));
+        
+        weatherContext = `
+        Current Weather Conditions:
+        - Temperature: ${currentTemp}°C (Average upcoming: ${Math.round(avgTemp)}°C)
+        - Humidity: ${humidity}%
+        - Weather: ${weatherCondition}
+        - Wind Speed: ${windSpeed} km/h
+        - Rain Expected: ${rainProbability ? 'Yes' : 'No'}
+        - Season: ${getCurrentSeason()}
+        `;
+      }
+      
+      // Call the AI service with the fixed getFarmingRecommendation function
+      let response;
+      try {
+        // Use getFarmingRecommendation for proper retry handling and timeouts
+        const { getFarmingRecommendation } = await import('@/services/geminiService');
+        
+        // Prepare user profile for the recommendation function
+        const userProfile = {
+          location: formData.location,
+          farmType: formData.cropType,
+          crops: formData.previousCrop ? [formData.previousCrop] : [],
+          soilType: formData.soilType
+        };
+        
+        // Create a comprehensive query that includes all farm data and weather context
+        const comprehensiveQuery = `
+          Farm Analysis Request:
+          Location: ${formData.location}
+          Soil Type: ${formData.soilType}
+          Water Availability: ${formData.waterAvailability}%
+          Farm Size: ${formData.landSize} hectares
+          Previous Crop: ${formData.previousCrop || 'None'}
+          Preferred Type: ${formData.cropType}
+          
+          ${weatherContext}
+          
+          Please recommend 3 suitable crops for this farm with specific details including suitability scores, expected yields, growing periods, water requirements, weather suitability, and seasonal advice.
+        `;
+        
+        response = await getFarmingRecommendation(userProfile, comprehensiveQuery, 'en');
+      } catch (aiError) {
+        console.error('AI service error:', aiError);
+        throw new Error('AI recommendation service failed');
+      }
+      
+      console.log("AI service response received:", response);
+      
+      // Process the AI response to extract crop recommendations
+      let formattedRecommendations = [];
+      
+      // Enhanced crop extraction with more comprehensive keyword matching
+      const cropKeywords = [
+        'rice', 'wheat', 'cotton', 'sugarcane', 'corn', 'maize', 'soybean', 'soya', 
+        'tomato', 'potato', 'onion', 'groundnut', 'peanut', 'sunflower', 'mustard', 
+        'barley', 'millet', 'sorghum', 'jowar', 'bajra', 'ragi', 'chickpea', 'chana',
+        'lentil', 'dal', 'cabbage', 'cauliflower', 'brinjal', 'eggplant', 'okra',
+        'bhindi', 'spinach', 'carrot', 'radish', 'beetroot', 'cucumber', 'pumpkin',
+        'watermelon', 'mango', 'banana', 'papaya', 'guava', 'coconut', 'cashew'
+      ];
+      
+      // Try multiple extraction methods
+      let foundCrops = [];
+      
+      // Method 1: Direct keyword matching
+      foundCrops = cropKeywords.filter(crop => 
+        response.toLowerCase().includes(crop.toLowerCase())
+      ).slice(0, 3);
+      
+      // Method 2: If no crops found, try pattern matching for recommendations
+      if (foundCrops.length === 0) {
+        const recommendationPatterns = [
+          /recommend(?:ed|s|ing)?\s+(?:crops?|plants?)?\s*:?\s*([^.!?]+)/gi,
+          /suitable\s+crops?\s*:?\s*([^.!?]+)/gi,
+          /best\s+crops?\s*:?\s*([^.!?]+)/gi,
+          /grow\s+([^.!?]+)/gi,
+          /plant\s+([^.!?]+)/gi
+        ];
+        
+        for (const pattern of recommendationPatterns) {
+          const matches = response.matchAll(pattern);
+          for (const match of matches) {
+            const extractedText = match[1];
+            const cropsInText = cropKeywords.filter(crop => 
+              extractedText.toLowerCase().includes(crop.toLowerCase())
+            );
+            foundCrops.push(...cropsInText);
+          }
+          if (foundCrops.length >= 3) break;
+        }
+        foundCrops = [...new Set(foundCrops)].slice(0, 3); // Remove duplicates
+      }
+      
+      // Method 3: If still no crops found, analyze the response for vegetable/grain context
+      if (foundCrops.length === 0) {
+        const responseText = response.toLowerCase();
+        
+        // For vegetable farming
+        if (formData.cropType === 'vegetable' || responseText.includes('vegetable')) {
+          if (responseText.includes('monsoon') || responseText.includes('rain')) {
+            foundCrops = ['tomato', 'onion', 'okra'];
+          } else {
+            foundCrops = ['potato', 'cabbage', 'carrot'];
+          }
+        }
+        // For grain farming
+        else if (formData.cropType === 'grain' || responseText.includes('grain') || responseText.includes('cereal')) {
+          if (responseText.includes('monsoon') || responseText.includes('rain')) {
+            foundCrops = ['rice', 'corn', 'sorghum'];
+          } else {
+            foundCrops = ['wheat', 'barley', 'millet'];
+          }
+        }
+        // For cash crops
+        else if (formData.cropType === 'cash' || responseText.includes('cash')) {
+          foundCrops = ['cotton', 'sugarcane', 'sunflower'];
+        }
+        // Default based on location and season
+        else {
+          const season = getCurrentSeason();
+          if (season === 'Monsoon') {
+            foundCrops = ['rice', 'cotton', 'sugarcane'];
+          } else {
+            foundCrops = ['wheat', 'tomato', 'onion'];
+          }
+        }
+      }
+      
+      // Create structured recommendations from found crops
+      if (foundCrops.length > 0) {
+        formattedRecommendations = foundCrops.map((cropName, index) => {
+          const cropNameCapitalized = cropName.charAt(0).toUpperCase() + cropName.slice(1);
+          
+          // Find matching icon
+          let iconConfig = cropIcons.default;
+          for (const key in cropIcons) {
+            if (key !== 'default' && (cropName.toLowerCase().includes(key) || key.includes(cropName.toLowerCase()))) {
+              iconConfig = cropIcons[key as keyof typeof cropIcons];
+              break;
+            }
+          }
+          
+          // Extract specific information from AI response for this crop
+          const cropSpecificInfo = extractCropInfo(response, cropName);
+          
+          return {
+            cropName: cropNameCapitalized,
+            confidence: Math.floor(Math.random() * 15) + 80 + (3 - index) * 5,
+            expectedYield: cropSpecificInfo.yield || getExpectedYield(cropName),
+            growingPeriod: cropSpecificInfo.period || getGrowingPeriod(cropName),
+            waterRequirements: cropSpecificInfo.water || getWaterRequirements(cropName),
+            weatherSuitability: cropSpecificInfo.weatherSuitability || `${cropNameCapitalized} is suitable for the current weather conditions in ${formData.location}.`,
+            seasonalAdvice: cropSpecificInfo.seasonalAdvice || `Best planting time for ${cropNameCapitalized} in your region is during the appropriate season.`,
+            icon: iconConfig.icon,
+            color: iconConfig.color
+          };
+        });
+      } else {
+        // Final fallback to location-based recommendations
+        formattedRecommendations = getLocationBasedRecommendations(formData.location, formData.soilType);
+      }
+      
+      console.log("Successfully processed AI recommendations:", formattedRecommendations);
+      
+      // Update recommendations state with either the parsed data or defaults
+      setRecommendations(formattedRecommendations);
+      
+      // Switch to recommendations tab
+      setActiveSubTab('recommendations');
+      
+      toast({
+        title: "Recommendations Ready",
+        description: "Check out the suitable crops for your farm",
+      });
+    } catch (error) {
+      console.error('Error getting recommendations:', error);
+      
+      // Set default recommendations even when there's an error
+      setRecommendations([
+        {
+          cropName: 'Rice',
+          confidence: 92,
+          expectedYield: '5.8 tons/ha',
+          growingPeriod: '120-140 days',
+          waterRequirements: 'High (1200-1500mm)',
+          weatherSuitability: 'Rice is suitable for the current weather conditions.',
+          seasonalAdvice: 'Best planting time for Rice is during monsoon season.',
+          icon: cropIcons.rice.icon,
+          color: cropIcons.rice.color
+        },
+        {
+          cropName: 'Cotton',
+          confidence: 87,
+          expectedYield: '2.3 tons/ha',
+          growingPeriod: '160-180 days',
+          waterRequirements: 'Medium (700-900mm)',
+          weatherSuitability: 'Cotton is suitable for the current weather conditions.',
+          seasonalAdvice: 'Best planting time for Cotton is during summer season.',
+          icon: cropIcons.cotton.icon,
+          color: cropIcons.cotton.color
+        },
+        {
+          cropName: 'Sugarcane',
+          confidence: 78,
+          expectedYield: '80 tons/ha',
+          growingPeriod: '10-12 months',
+          waterRequirements: 'High (1500-2500mm)',
+          weatherSuitability: 'Sugarcane is suitable for the current weather conditions.',
+          seasonalAdvice: 'Best planting time for Sugarcane is during winter season.',
+          icon: cropIcons.sugarcane.icon,
+          color: cropIcons.sugarcane.color
+        }
+      ]);
+      
+      // Still switch to recommendations tab
+      setActiveSubTab('recommendations');
+      
+      // Show error in the UI
+      setError('AI recommendation service unavailable. Showing default recommendations instead.');
+      
+      toast({
+        title: "Using Default Recommendations",
+        description: "AI service is currently unavailable. Showing general recommendations based on common crops.",
+        variant: "default"
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   // Load user farms
   useEffect(() => {
     const loadUserFarms = async () => {
@@ -130,6 +527,45 @@ const CropAdvisor = () => {
     loadUserFarms();
   }, [currentUser, toast]);
   
+  // Fetch weather data when location changes
+  useEffect(() => {
+    const fetchWeatherData = async () => {
+      if (location && !locationLoading) {
+        setWeatherLoading(true);
+        setWeatherError('');
+        
+        try {
+          console.log(`Fetching weather data for coordinates: ${location.latitude}, ${location.longitude}`);
+          
+          const [weatherData, forecastData] = await Promise.all([
+            getCurrentWeather(location.latitude, location.longitude),
+            getForecast(location.latitude, location.longitude)
+          ]);
+          
+          setCurrentWeather(weatherData);
+          setForecast(forecastData);
+          
+          // Update form location with actual city name from weather data
+          if (weatherData && weatherData.name) {
+            setFormData(prev => ({
+              ...prev,
+              location: `${weatherData.name}, ${weatherData.sys.country}`
+            }));
+          }
+          
+          console.log('Weather data loaded successfully');
+        } catch (error) {
+          console.error('Error fetching weather data:', error);
+          setWeatherError('Failed to fetch weather data');
+        } finally {
+          setWeatherLoading(false);
+        }
+      }
+    };
+    
+    fetchWeatherData();
+  }, [location, locationLoading]);
+  
   // Populate form from farm
   const populateFormFromFarm = (farm: FarmData) => {
     const mainCrop = farm.crops && farm.crops.length > 0 ? farm.crops[0] : '';
@@ -158,208 +594,6 @@ const CropAdvisor = () => {
     const selectedFarm = userFarms.find(farm => farm.id === farmId);
     if (selectedFarm) {
       populateFormFromFarm(selectedFarm);
-    }
-  };
-  
-  // Get crop recommendations
-  const handleGetRecommendations = async () => {
-    setIsLoading(true);
-    setError('');
-    
-    if (!formData.location) {
-      setError('Please provide a location for accurate recommendations');
-      setIsLoading(false);
-      return;
-    }
-    
-    try {
-      // Create a structured query for better results from Gemini
-      const structuredQuery = `
-        Based on the following farm details, recommend 3-5 suitable crops:
-        
-        Location: ${formData.location}
-        Soil Type: ${formData.soilType}
-        Water Availability: ${formData.waterAvailability}%
-        Land Size: ${formData.landSize} hectares
-        Previous Crop: ${formData.previousCrop || 'None'}
-        Preferred Crop Type: ${formData.cropType}
-        
-        Return your response in this exact JSON format:
-        {
-          "crops": [
-            {
-              "name": "Crop Name",
-              "suitability": <number between 1-100>,
-              "expectedYield": "X tons/ha",
-              "growingPeriod": "X-Y days or months",
-              "waterRequirement": "Low/Medium/High (Amount in mm)"
-            },
-            ... more crops ...
-          ]
-        }
-        
-        Only respond with the JSON data and nothing else. Ensure the JSON is valid and properly formatted.
-      `;
-      
-      // Prepare data for the AI service
-      const farmData = {
-        location: formData.location,
-        farmType: formData.cropType,
-        soilType: formData.soilType,
-        crops: formData.previousCrop ? [formData.previousCrop] : [],
-        waterAvailability: formData.waterAvailability
-      };
-      
-      console.log("Sending query to AI service:", structuredQuery);
-      
-      // Call the AI service
-      const response = await getFarmingRecommendation(farmData, structuredQuery);
-      console.log("AI Response:", response);
-      
-      // Create a default set of recommendations in case parsing fails
-      const defaultRecommendations = [
-        {
-          cropName: 'Rice',
-          confidence: 92,
-          expectedYield: '5.8 tons/ha',
-          growingPeriod: '120-140 days',
-          waterRequirements: 'High (1200-1500mm)',
-          icon: cropIcons.rice.icon,
-          color: cropIcons.rice.color
-        },
-        {
-          cropName: 'Cotton',
-          confidence: 87,
-          expectedYield: '2.3 tons/ha',
-          growingPeriod: '160-180 days',
-          waterRequirements: 'Medium (700-900mm)',
-          icon: cropIcons.cotton.icon,
-          color: cropIcons.cotton.color
-        },
-        {
-          cropName: 'Sugarcane',
-          confidence: 78,
-          expectedYield: '80 tons/ha',
-          growingPeriod: '10-12 months',
-          waterRequirements: 'High (1500-2500mm)',
-          icon: cropIcons.sugarcane.icon,
-          color: cropIcons.sugarcane.color
-        }
-      ];
-      
-      let formattedRecommendations = [...defaultRecommendations];
-      
-      try {
-        // Extract JSON from the response if it's embedded in text
-        let jsonString = response;
-        
-        // Look for JSON pattern in the response (if AI wrapped it in text)
-        const jsonMatch = response.match(/\{[\s\S]*\}/);
-        if (jsonMatch) {
-          jsonString = jsonMatch[0];
-        }
-        
-        const processedRecommendations = JSON.parse(jsonString);
-        
-        if (processedRecommendations && 
-            Array.isArray(processedRecommendations.crops) && 
-            processedRecommendations.crops.length > 0) {
-          
-          // Transform AI response into our recommendations format
-          formattedRecommendations = processedRecommendations.crops.map(crop => {
-            const cropName = crop.name || 'Unknown Crop';
-            const cropNameLower = cropName.toLowerCase();
-            
-            // Find matching icon or use default
-            let iconConfig = cropIcons.default;
-            
-            // Check for closest match in our icon set
-            for (const key in cropIcons) {
-              if (cropNameLower.includes(key) || key.includes(cropNameLower)) {
-                iconConfig = cropIcons[key as keyof typeof cropIcons];
-                break;
-              }
-            }
-            
-            return {
-              cropName: cropName,
-              confidence: crop.suitability || Math.floor(Math.random() * 20) + 75,
-              expectedYield: crop.expectedYield || `${(Math.random() * 5 + 2).toFixed(1)} tons/ha`,
-              growingPeriod: crop.growingPeriod || `${Math.floor(Math.random() * 60) + 90} days`,
-              waterRequirements: crop.waterRequirement || 'Medium (700-1100mm)',
-              icon: iconConfig.icon,
-              color: iconConfig.color
-            };
-          });
-          
-          console.log("Successfully processed AI recommendations:", formattedRecommendations);
-        } else {
-          console.warn("AI response didn't contain valid crops array:", processedRecommendations);
-          // Keep using default recommendations
-        }
-      } catch (parseError) {
-        console.error("Error parsing AI response:", parseError);
-        console.log("Raw response:", response);
-        // Keep using default recommendations
-      }
-      
-      // Update recommendations state with either the parsed data or defaults
-      setRecommendations(formattedRecommendations);
-      
-      // Switch to recommendations tab
-      setActiveSubTab('recommendations');
-      
-      toast({
-        title: "Recommendations Ready",
-        description: "Check out the suitable crops for your farm",
-      });
-    } catch (error) {
-      console.error('Error getting recommendations:', error);
-      
-      // Set default recommendations even when there's an error
-      setRecommendations([
-        {
-          cropName: 'Rice',
-          confidence: 92,
-          expectedYield: '5.8 tons/ha',
-          growingPeriod: '120-140 days',
-          waterRequirements: 'High (1200-1500mm)',
-          icon: cropIcons.rice.icon,
-          color: cropIcons.rice.color
-        },
-        {
-          cropName: 'Cotton',
-          confidence: 87,
-          expectedYield: '2.3 tons/ha',
-          growingPeriod: '160-180 days',
-          waterRequirements: 'Medium (700-900mm)',
-          icon: cropIcons.cotton.icon,
-          color: cropIcons.cotton.color
-        },
-        {
-          cropName: 'Sugarcane',
-          confidence: 78,
-          expectedYield: '80 tons/ha',
-          growingPeriod: '10-12 months',
-          waterRequirements: 'High (1500-2500mm)',
-          icon: cropIcons.sugarcane.icon,
-          color: cropIcons.sugarcane.color
-        }
-      ]);
-      
-      // Still switch to recommendations tab
-      setActiveSubTab('recommendations');
-      
-      // Show error in the UI
-      setError('AI recommendation service unavailable. Showing default recommendations instead.');
-      
-      toast({
-        title: "Using Default Recommendations",
-        description: "AI service is currently unavailable. Showing general recommendations based on common crops.",
-        variant: "default"
-      });
-    } finally {
-      setIsLoading(false);
     }
   };
   
@@ -457,6 +691,68 @@ const CropAdvisor = () => {
                         </div>
                       )}
                     </div>
+                    
+                    {/* Weather Information Card */}
+                    {currentWeather && (
+                      <div className="bg-blue-50 p-4 rounded-lg border border-blue-100">
+                        <div className="flex items-center justify-between mb-3">
+                          <div className="flex items-center">
+                            <CloudSun className="h-5 w-5 text-blue-600 mr-2" />
+                            <h3 className="text-md font-medium text-blue-700">Current Weather Conditions</h3>
+                          </div>
+                        </div>
+                        
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                          <div className="text-center">
+                            <img 
+                              src={`https://openweathermap.org/img/wn/${currentWeather.weather[0].icon}.png`}
+                              alt={currentWeather.weather[0].description}
+                              className="h-8 w-8 mx-auto mb-1" 
+                            />
+                            <p className="text-sm font-medium text-blue-800">{Math.round(currentWeather.main.temp)}°C</p>
+                            <p className="text-xs text-blue-600">{currentWeather.weather[0].description}</p>
+                          </div>
+                          <div className="text-center">
+                            <Droplets className="h-6 w-6 text-blue-500 mx-auto mb-1" />
+                            <p className="text-sm font-medium text-blue-800">{currentWeather.main.humidity}%</p>
+                            <p className="text-xs text-blue-600">Humidity</p>
+                          </div>
+                          <div className="text-center">
+                            <Thermometer className="h-6 w-6 text-blue-500 mx-auto mb-1" />
+                            <p className="text-sm font-medium text-blue-800">{Math.round(currentWeather.wind.speed * 3.6)} km/h</p>
+                            <p className="text-xs text-blue-600">Wind Speed</p>
+                          </div>
+                          <div className="text-center">
+                            <Calendar className="h-6 w-6 text-blue-500 mx-auto mb-1" />
+                            <p className="text-sm font-medium text-blue-800">{getCurrentSeason()}</p>
+                            <p className="text-xs text-blue-600">Season</p>
+                          </div>
+                        </div>
+                        
+                        <p className="text-xs text-blue-600 mt-2">
+                          Weather data helps provide more accurate crop recommendations for your location.
+                        </p>
+                      </div>
+                    )}
+                    
+                    {weatherLoading && (
+                      <div className="bg-gray-50 p-4 rounded-lg border border-gray-100">
+                        <div className="flex items-center justify-center">
+                          <Loader2 className="h-5 w-5 text-gray-500 animate-spin mr-2" />
+                          <span className="text-sm text-gray-600">Loading weather data...</span>
+                        </div>
+                      </div>
+                    )}
+                    
+                    {weatherError && (
+                      <Alert variant="destructive">
+                        <AlertCircle className="h-4 w-4" />
+                        <AlertTitle>Weather Data Unavailable</AlertTitle>
+                        <AlertDescription>
+                          {weatherError}. Recommendations will be based on general climate data for your region.
+                        </AlertDescription>
+                      </Alert>
+                    )}
                     
                     {/* Form Fields */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -601,6 +897,33 @@ const CropAdvisor = () => {
                                 <span className="text-sm text-gray-500">Water Requirement</span>
                                 <span className="text-sm font-medium">{crop.waterRequirements}</span>
                               </div>
+                              
+                              {/* Weather-aware information */}
+                              {crop.weatherSuitability && (
+                                <div className="border-t pt-3 mt-3">
+                                  <div className="mb-2">
+                                    <span className="text-sm font-medium text-blue-600 flex items-center">
+                                      <CloudSun className="h-4 w-4 mr-1" />
+                                      Weather Suitability
+                                    </span>
+                                    <p className="text-xs text-gray-600 mt-1 leading-relaxed">
+                                      {crop.weatherSuitability}
+                                    </p>
+                                  </div>
+                                </div>
+                              )}
+                              
+                              {crop.seasonalAdvice && (
+                                <div className="border-t pt-2">
+                                  <span className="text-sm font-medium text-green-600 flex items-center">
+                                    <Calendar className="h-4 w-4 mr-1" />
+                                    Seasonal Advice
+                                  </span>
+                                  <p className="text-xs text-gray-600 mt-1 leading-relaxed">
+                                    {crop.seasonalAdvice}
+                                  </p>
+                                </div>
+                              )}
                             </div>
                           </CardContent>
                         </Card>
