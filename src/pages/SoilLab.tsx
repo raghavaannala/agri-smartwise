@@ -11,6 +11,8 @@ import { analyzeSoil } from '@/services/geminiService';
 import { useTranslation } from 'react-i18next';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { RefreshCw } from 'lucide-react';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
 interface SoilNutrients {
   nitrogen: number;
@@ -25,6 +27,30 @@ interface SoilProperties {
   texture: string;
   waterRetention: number;
   drainage: string;
+}
+
+interface SoilMoistureRecord {
+  timestamp: string;
+  moisture: number;
+  entry_id: number;
+}
+
+interface ThingSpeakResponse {
+  channel: {
+    id: number;
+    name: string;
+    field1: string;
+    field2: string;
+    created_at: string;
+    updated_at: string;
+    last_entry_id: number;
+  };
+  feeds: Array<{
+    created_at: string;
+    entry_id: number;
+    field1: string;
+    field2: string;
+  }>;
 }
 
 type SoilAnalysisResult = {
@@ -47,6 +73,9 @@ const SoilLab = () => {
   const [analysisResult, setAnalysisResult] = useState<SoilAnalysisResult | null>(null);
   const [noSoilDetected, setNoSoilDetected] = useState(false);
   const [serviceReady, setServiceReady] = useState(false);
+  const [soilMoistureHistory, setSoilMoistureHistory] = useState<SoilMoistureRecord[]>([]);
+  const [isLoadingHistory, setIsLoadingHistory] = useState(false);
+  const [historyError, setHistoryError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
@@ -80,6 +109,50 @@ const SoilLab = () => {
 
     checkService();
   }, [toast]);
+
+  // Fetch soil moisture history from ThingSpeak API
+  const fetchSoilMoistureHistory = async () => {
+    try {
+      setIsLoadingHistory(true);
+      setHistoryError(null);
+      const response = await fetch(
+        'https://api.thingspeak.com/channels/3083456/feeds.json?api_key=HGDMVZ6JNDEXHY8Y&results=50'
+      );
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch soil moisture data');
+      }
+      
+      const data: ThingSpeakResponse = await response.json();
+      
+      // Transform the API response into our format
+      const historyData = data.feeds
+        .filter(feed => feed.field1) // Filter out null/undefined values
+        .map((feed) => ({
+          timestamp: feed.created_at,
+          moisture: parseFloat(feed.field1),
+          entry_id: feed.entry_id
+        }))
+        .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+      
+      setSoilMoistureHistory(historyData);
+    } catch (error) {
+      console.error('Error fetching soil moisture history:', error);
+      setHistoryError(t('soilLab.errorLoadingHistory', 'Failed to load soil moisture history'));
+      toast({
+        title: t('common.error', 'Error'),
+        description: t('soilLab.errorLoadingHistory', 'Failed to load soil moisture history'),
+        variant: 'destructive',
+      });
+    } finally {
+      setIsLoadingHistory(false);
+    }
+  };
+
+  // Fetch history when component mounts
+  useEffect(() => {
+    fetchSoilMoistureHistory();
+  }, []);
 
   const handleImageUpload = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -713,11 +786,12 @@ const SoilLab = () => {
                 </CardHeader>
                 <CardContent>
                   <Tabs defaultValue="overview">
-                    <TabsList className="mb-4">
+                    <TabsList className="grid h-full grid-cols-5">
                       <TabsTrigger value="overview">{t('soilLab.overview')}</TabsTrigger>
                       <TabsTrigger value="nutrients">{t('soilLab.nutrients')}</TabsTrigger>
                       <TabsTrigger value="properties">{t('soilLab.properties')}</TabsTrigger>
                       <TabsTrigger value="recommendations">{t('soilLab.recommendations')}</TabsTrigger>
+                      <TabsTrigger value="moistureHistory">{t('soilLab.moistureHistory', 'Moisture History')}</TabsTrigger>
                       <TabsTrigger value="healthScore">{t('soilLab.healthScore')}</TabsTrigger>
                     </TabsList>
                     
@@ -1094,6 +1168,48 @@ const SoilLab = () => {
                             <li key={index}>{recommendation.crop} ({recommendation.suitability}% - {recommendation.reason})</li>
                           ))}
                         </ul>
+                      </div>
+                    </TabsContent>
+                    
+                    <TabsContent value="moistureHistory" className="space-y-4">
+                      <div className="bg-agri-blue/10 p-4 rounded-md mb-4">
+                        <h4 className="font-medium flex items-center text-agri-darkGreen mb-2">
+                          <Droplets className="h-4 w-4 mr-1 text-agri-blue" />
+                          {t('soilLab.soilMoistureHistory', 'Soil Moisture History')}
+                        </h4>
+                        <div className="flex items-center space-x-2">
+                          <p className="text-sm text-gray-500">{t('soilLab.moistureHistoryDescription')}</p>
+                          {isLoadingHistory && (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          )}
+                          {historyError && (
+                            <AlertTriangle className="h-4 w-4 text-red-500" />
+                          )}
+                        </div>
+                        <div className="mt-2">
+                          {soilMoistureHistory.length > 0 ? (
+                            <LineChart
+                              width={400}
+                              height={200}
+                              data={soilMoistureHistory}
+                              margin={{
+                                top: 5,
+                                right: 30,
+                                left: 20,
+                                bottom: 5,
+                              }}
+                            >
+                              <CartesianGrid strokeDasharray="3 3" />
+                              <XAxis dataKey="timestamp" />
+                              <YAxis />
+                              <Tooltip />
+                              <Legend />
+                              <Line type="monotone" dataKey="moisture" stroke="#8884d8" activeDot={{ r: 8 }} />
+                            </LineChart>
+                          ) : (
+                            <p className="text-sm text-gray-500">{t('soilLab.noMoistureHistory')}</p>
+                          )}
+                        </div>
                       </div>
                     </TabsContent>
                   </Tabs>

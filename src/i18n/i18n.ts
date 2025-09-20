@@ -8,6 +8,13 @@ const logMissingTranslations = true;
 import enTranslation from './locales/en/translation.json';
 import teTranslation from './locales/te/translation.json';
 import hiTranslation from './locales/hi/translation.json';
+import taTranslation from './locales/ta/translation.json';
+import knTranslation from './locales/kn/translation.json';
+import mlTranslation from './locales/ml/translation.json';
+import bnTranslation from './locales/bn/translation.json';
+import guTranslation from './locales/gu/translation.json';
+import paTranslation from './locales/pa/translation.json';
+import mrTranslation from './locales/mr/translation.json';
 
 // Ensure translations are properly loaded
 const resources = {
@@ -19,6 +26,27 @@ const resources = {
   },
   hi: {
     translation: hiTranslation
+  },
+  ta: {
+    translation: taTranslation
+  },
+  kn: {
+    translation: knTranslation
+  },
+  ml: {
+    translation: mlTranslation
+  },
+  bn: {
+    translation: bnTranslation
+  },
+  gu: {
+    translation: guTranslation
+  },
+  pa: {
+    translation: paTranslation
+  },
+  mr: {
+    translation: mrTranslation
   }
 };
 

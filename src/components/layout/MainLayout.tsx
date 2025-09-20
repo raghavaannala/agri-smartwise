@@ -4,7 +4,6 @@ import Sidebar from './Sidebar';
 import Footer from './Footer';
 import AgribotChat from '../dashboard/AgribotChat';
 import VoiceAssistant from '../voice/VoiceAssistant';
-import FarmingAlerts from '@/components/common/FarmingAlerts';
 import { useAuth } from '@/contexts/AuthContext';
 import { getUserFarms } from '@/lib/firestore';
 import { AnimatePresence, motion } from 'framer-motion';
@@ -99,18 +98,6 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
               <AgribotChat />
               <VoiceAssistant />
             </div>
-            
-            {/* Farming Alerts - Always show */}
-            <FarmingAlerts 
-              farmData={selectedFarm ? {
-                location: selectedFarm.location,
-                soilType: selectedFarm.soilType,
-                crops: selectedFarm.crops || [],
-                size: selectedFarm.size,
-                irrigationSystem: selectedFarm.irrigationSystem
-              } : undefined}
-              cropJourney={cropJourney}
-            />
           </motion.div>
         )}
       </AnimatePresence>

@@ -113,6 +113,7 @@ const WelcomeBanner: React.FC<WelcomeBannerProps> = ({
   location: defaultLocation
 }) => {
   const { currentUser } = useAuth();
+  const { t } = useTranslation();
   const isGuest = !currentUser || userName === 'Guest';
   const [profileName, setProfileName] = useState<string>(userName);
   const { location: geoLocation, loading: locationLoading, usingFallback } = useLocation();
@@ -217,6 +218,17 @@ const WelcomeBanner: React.FC<WelcomeBannerProps> = ({
     return '🌤️';
   };
 
+  const translateWeatherCondition = (condition: string) => {
+    const lowerCondition = condition.toLowerCase();
+    if (lowerCondition.includes('rain') || lowerCondition.includes('shower')) return t('weather.lightRain');
+    if (lowerCondition.includes('cloud')) return t('weather.partlyCloudy');
+    if (lowerCondition.includes('sun') || lowerCondition.includes('clear')) return t('weather.sunny');
+    if (lowerCondition.includes('wind')) return t('weather.windy');
+    if (lowerCondition.includes('storm') || lowerCondition.includes('thunder')) return t('weather.stormy');
+    if (lowerCondition.includes('mist') || lowerCondition.includes('fog')) return t('weather.foggy');
+    return condition; // fallback to original if no match
+  };
+
   const getTimeOfDay = () => {
     const hour = new Date().getHours();
     if (hour < 6) return 'night';
@@ -229,10 +241,10 @@ const WelcomeBanner: React.FC<WelcomeBannerProps> = ({
   const getGreeting = () => {
     const timeOfDay = getTimeOfDay();
     const greetings = {
-      morning: 'Good morning',
-      afternoon: 'Good afternoon',
-      evening: 'Good evening',
-      night: 'Good night'
+      morning: t('common.goodMorning'),
+      afternoon: t('common.goodAfternoon'),
+      evening: t('common.goodEvening'),
+      night: t('common.goodNight')
     };
     return greetings[timeOfDay];
   };
@@ -334,16 +346,16 @@ const WelcomeBanner: React.FC<WelcomeBannerProps> = ({
             <h2 className="text-sm font-medium text-white/90 mb-1">{getGreeting()}</h2>
             <h1 className="text-2xl md:text-3xl font-bold mb-3 flex items-center">
               {isGuest 
-                ? "Welcome to SmartAgroX! 🌱" 
-                : `Welcome back, ${profileName || userName}! ${getWeatherEmoji(weatherData.condition)}`
+                ? t('dashboard.welcome') + "! 🌱"
+                : t('dashboard.welcomeMessage', { name: profileName || userName }) + ` ${getWeatherEmoji(weatherData.condition)}`
               }
             </h1>
-            <p className="text-white/90 max-w-xl leading-relaxed backdrop-blur-sm bg-black/5 p-3 rounded-lg border border-white/10">
+            {/* <p className="text-white/90 max-w-xl leading-relaxed backdrop-blur-sm bg-black/5 p-3 rounded-lg border border-white/10">
               {isGuest
-                ? "Transform your farming with data-driven insights, smart recommendations, and precision agriculture technology for optimal yields and sustainability."
-                : `Your farm is thriving! Explore personalized insights, weather impacts, and recommendations to maximize your agricultural success today.`
+                ? "Transform your farming with data-dYour farm is thriving! Explore personalized insights, weather impacts, and recommendations to maximize your agricultural success today.riven insights, smart recommendations, and precision agriculture technology for optimal yields and sustainability."
+                : ``
               }
-            </p>
+            </p> */}
           </motion.div>
           
           {!isGuest && (
@@ -355,7 +367,7 @@ const WelcomeBanner: React.FC<WelcomeBannerProps> = ({
             >
               <div className={`flex items-center bg-${currentTheme.accent}-${currentTheme.bgOpacity} backdrop-blur-sm px-4 py-2 rounded-lg border border-${currentTheme.borderColor} shadow-sm`}>
                 <Leaf className={`h-4 w-4 mr-2 text-${currentTheme.iconText}`} />
-                <span className="text-sm font-medium">Season: Spring</span>
+                <span className="text-sm font-medium">{t('common.season')}: {t('common.spring')}</span>
               </div>
               
               <div className={`flex items-center bg-${currentTheme.accent}-${currentTheme.bgOpacity} backdrop-blur-sm px-4 py-2 rounded-lg border border-${currentTheme.borderColor} shadow-sm`}>
@@ -363,12 +375,12 @@ const WelcomeBanner: React.FC<WelcomeBannerProps> = ({
                 <span className="text-sm font-medium">
                   {locationFetching ? (
                     <span className="flex items-center">
-                      Loading location... <Loader className="h-3 w-3 ml-1 animate-spin" />
+                      {t('common.loadingLocation')}... <Loader className="h-3 w-3 ml-1 animate-spin" />
                     </span>
                   ) : displayLocation ? (
                     <span>
                       {displayLocation}
-                      {usingFallback && realLocation && <span className="ml-1 text-xs text-yellow-200">(Default)</span>}
+                      {usingFallback && realLocation && <span className="ml-1 text-xs text-yellow-200">({t('common.default')})</span>}
                     </span>
                   ) : (
                     defaultLocation
@@ -380,7 +392,7 @@ const WelcomeBanner: React.FC<WelcomeBannerProps> = ({
                 className={`flex items-center bg-${currentTheme.accentBtn} hover:bg-${currentTheme.accentBtnHover} backdrop-blur-sm px-4 py-2 rounded-lg transition-colors shadow-sm border border-${currentTheme.borderColor}`}
                 onClick={handleViewFarm}
               >
-                <span className="text-sm font-medium mr-1">View Farm</span>
+                <span className="text-sm font-medium mr-1">{t('common.viewFarm')}</span>
                 <ArrowRight className="h-4 w-4" />
               </button>
             </motion.div>
@@ -399,7 +411,7 @@ const WelcomeBanner: React.FC<WelcomeBannerProps> = ({
               {weatherIcon()}
             </div>
             <div>
-              <p className="text-white/80 text-sm">{weatherData.condition}</p>
+              <p className="text-white/80 text-sm">{translateWeatherCondition(weatherData.condition)}</p>
               <p className="text-3xl font-bold">{weatherData.temperature}°C</p>
             </div>
           </div>
@@ -407,24 +419,24 @@ const WelcomeBanner: React.FC<WelcomeBannerProps> = ({
           <div className="grid grid-cols-2 gap-3 mt-4">
             <div className={`flex flex-col items-center bg-${currentTheme.widgetBg} rounded-lg py-2`}>
               <Droplets className={`h-4 w-4 mb-1 text-${currentTheme.iconText}`} />
-              <span className="text-xs text-white/70">Humidity</span>
+              <span className="text-xs text-white/70">{t('common.humidity')}</span>
               <span className="text-sm font-medium">{weatherData.humidity}%</span>
             </div>
             <div className={`flex flex-col items-center bg-${currentTheme.widgetBg} rounded-lg py-2`}>
               <Wind className={`h-4 w-4 mb-1 text-${currentTheme.iconText}`} />
-              <span className="text-xs text-white/70">Wind</span>
+              <span className="text-xs text-white/70">{t('common.wind')}</span>
               <span className="text-sm font-medium">{weatherData.wind} km/h</span>
             </div>
           </div>
           
           <div className="mt-3 pt-3 border-t border-white/10">
             <div className="flex items-center justify-between text-xs text-white/80">
-              <span>Feels like: {weatherData.feelsLike}°C</span>
+              <span>{t('common.feelsLike')}: {weatherData.feelsLike}°C</span>
               <span className="flex items-center">
                 <MapPin className="h-3 w-3 mr-1" /> 
                 {locationFetching ? (
                   <span className="flex items-center">
-                    <Loader className="h-2 w-2 mr-1 animate-spin" /> Loading...
+                    <Loader className="h-2 w-2 mr-1 animate-spin" /> {t('common.loading')}
                   </span>
                 ) : (
                   <span>{displayLocation.split(',')[0]}</span>
@@ -450,17 +462,17 @@ const WelcomeBanner: React.FC<WelcomeBannerProps> = ({
           </div>
           <div className="flex-1">
             <div className="flex items-center">
-              <h3 className="font-medium text-white">AgroVision</h3>
+              <h3 className="font-medium text-white">{t('common.agroVision')}</h3>
               <Badge className="ml-2 bg-agri-teal/20 text-white border-agri-teal/30 text-xs">
-                New
+                {t('common.new')}
               </Badge>
             </div>
-            <p className="text-xs text-white/70">Satellite Crop Health Monitoring</p>
+            <p className="text-xs text-white/70">{t('common.satelliteCropHealthMonitoring')}</p>
           </div>
         </div>
         
         <p className="text-sm text-white/80 mb-3">
-          Monitor your fields with real-time satellite imagery and NDVI analysis
+          {t('common.monitorYourFieldsWithRealTimeSatelliteImageryAndNDVIAnalysis')}
         </p>
         
         <motion.button
@@ -470,7 +482,7 @@ const WelcomeBanner: React.FC<WelcomeBannerProps> = ({
           onClick={() => navigate('/agrovision')}
         >
           <Globe className="h-4 w-4 mr-2" />
-          Launch AgroVision
+          {t('common.launchAgroVision')}
           <ArrowRight className="h-4 w-4 ml-1" />
         </motion.button>
       </motion.div>
