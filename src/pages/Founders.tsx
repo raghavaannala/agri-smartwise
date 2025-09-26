@@ -192,7 +192,7 @@ const Founders = () => {
       name: 'Anji',
       role: 'Database Administrator & Data Architect',
       bio: 'Database management specialist focused on data architecture optimization and ensuring reliable data storage for agricultural insights.',
-      image: 'public/founders/WhatsApp Image 2025-09-20 at 4.45.59 PM.jpeg', // Placeholder for future image
+      image: '/founders/anji.png', // Placeholder for future image
       linkedin: '#', // Placeholder for LinkedIn profile
       expertise: ['Database Management', 'Data Architecture', 'Performance Optimization', 'Data Security'],
       achievements: [
